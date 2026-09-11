@@ -138,6 +138,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   const {
     isFullscreen,
     fullscreenWarning,
+    windowBlurWarning,
     requestFullscreen,
     exitFullscreen,
     dismissFullscreenWarning,
@@ -147,6 +148,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
       reportViolation(eventType, severity, 0, desc);
     },
   });
+
 
   // Request fullscreen on start
   useEffect(() => {
@@ -341,6 +343,18 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
         </div>
       )}
 
+      {/* WINDOW BLUR / ALT+TAB WARNING BANNER */}
+      {windowBlurWarning && !kickOutNotice && (
+        <div className="bg-amber-500/95 text-slate-950 px-4 py-2 text-xs flex items-center justify-between font-bold sticky top-[57px] z-20 shadow-lg animate-pulse">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
+            <span>
+              {windowBlurWarning} Incident and webcam evidence snapshot have been logged!
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* FULLSCREEN WARNING BANNER */}
       {fullscreenWarning && !kickOutNotice && (
         <div className="bg-rose-600/90 text-white px-4 py-2 text-xs flex items-center justify-between font-semibold sticky top-[57px] z-20 shadow-md">
@@ -355,12 +369,13 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
               dismissFullscreenWarning();
               requestFullscreen();
             }}
-            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors shrink-0 ml-3"
+            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors shrink-0 ml-3 cursor-pointer"
           >
             Restore Fullscreen
           </button>
         </div>
       )}
+
 
       {/* MAIN ARENA WORKSPACE */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
