@@ -34,15 +34,49 @@ function getProcessingContext(width: number, height: number): CanvasRenderingCon
 /**
  * Captures current video frame as high-quality base64 JPEG image for evidence logging.
  */
-export function captureVideoFrame(video: HTMLVideoElement, quality = 0.8): string {
+export function captureVideoFrame(video: HTMLVideoElement, quality = 0.85): string {
   if (!video) return '';
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth || 640;
   canvas.height = video.videoHeight || 480;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
-  // Mirror if webcam is mirrored
+  
+  // Draw current video frame
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Draw accurate candidate device timestamp watermark at bottom-right
+  const now = new Date();
+  const timeStr =
+    now.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }) +
+    ' ' +
+    now.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    });
+
+  const bannerText = `DEVICE: ${timeStr}`;
+  ctx.font = 'bold 12px "Courier New", monospace, sans-serif';
+  const textWidth = ctx.measureText(bannerText).width;
+  const pillW = textWidth + 18;
+  const pillH = 22;
+  const pillX = canvas.width - pillW - 10;
+  const pillY = canvas.height - pillH - 10;
+
+  // Translucent dark backing pill
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  ctx.fillRect(pillX, pillY, pillW, pillH);
+
+  // Glowing Cyan text
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillText(bannerText, pillX + 9, pillY + 15);
+
   return canvas.toDataURL('image/jpeg', quality);
 }
 

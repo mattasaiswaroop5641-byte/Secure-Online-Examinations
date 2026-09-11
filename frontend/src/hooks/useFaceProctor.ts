@@ -74,7 +74,9 @@ export function useFaceProctor({
           duration_seconds: Math.round(duration * 10) / 10,
           description,
           screenshot_base64: screenshotBase64 || undefined,
+          timestamp: new Date().toISOString(),
         });
+
 
         // Deduct local trust score for instant feedback
         const deductions: Record<ViolationSeverity, number> = {

@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import base64
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 from app.config import settings
 
 # Load OpenCV's built-in Haar Cascade for frontal face detection
@@ -85,10 +85,11 @@ def save_evidence_snapshot(
     image_base64: str,
     attempt_id: int,
     event_type: str,
-    severity: str
+    severity: str,
+    event_time: Optional[datetime] = None
 ) -> str:
     """
-    Decodes an evidence frame, draws forensic bounding box annotations and a timestamp watermark,
+    Decodes an evidence frame, draws forensic bounding box annotations and an accurate timestamp watermark,
     returns a high-reliability watermarked base64 Data URI stored directly in MongoDB Atlas,
     and also writes to disk if available.
     """
@@ -102,19 +103,38 @@ def save_evidence_snapshot(
         for box in boxes:
             x, y, w, h = box["x"], box["y"], box["width"], box["height"]
             cv2.rectangle(image, (x, y), (x + w, y + h), box_color, 2)
+            cv2.putText(
+                image,
+                f"Face #{face_count}",
+                (x, max(18, y - 6)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                box_color,
+                1,
+                cv2.LINE_AA
+            )
         
-        # Timestamp and watermark banner
-        timestamp_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        banner_text = f"[ExamShield Forensic] {event_type} | {severity} | {timestamp_str}"
+        # Timestamp resolution
+        ts = event_time if event_time else datetime.now(timezone.utc)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        timestamp_str = ts.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         
-        # Draw background bar for text
-        cv2.rectangle(image, (0, 0), (image.shape[1], 28), (20, 20, 20), -1)
+        # Forensic top banner
+        img_h, img_w = image.shape[:2]
+        banner_h = 30
+        cv2.rectangle(image, (0, 0), (img_w, banner_h), (18, 20, 26), -1)
+        
+        # Recording indicator circle
+        cv2.circle(image, (14, int(banner_h / 2)), 4, (0, 0, 255), -1)
+        
+        banner_text = f"EXAM PROCTOR AUDIT | {event_type} | {severity} | {timestamp_str}"
         cv2.putText(
             image,
             banner_text,
-            (10, 18),
+            (26, 20),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.45,
+            0.40,
             (255, 255, 255),
             1,
             cv2.LINE_AA
@@ -122,14 +142,14 @@ def save_evidence_snapshot(
         
         # Save to disk if writable
         try:
-            filename = f"attempt_{attempt_id}_{event_type.lower()}_{int(datetime.utcnow().timestamp())}.jpg"
+            filename = f"attempt_{attempt_id}_{event_type.lower()}_{int(ts.timestamp())}.jpg"
             file_path = settings.EVIDENCE_DIR / filename
             cv2.imwrite(str(file_path), image)
         except Exception:
             pass
 
         # Return self-contained watermarked Data URI for permanent Atlas storage
-        success, buffer = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        success, buffer = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 80])
         if success:
             b64_str = base64.b64encode(buffer).decode('utf-8')
             return f"data:image/jpeg;base64,{b64_str}"
@@ -138,4 +158,5 @@ def save_evidence_snapshot(
     except Exception as e:
         print(f"Error saving evidence snapshot: {e}")
         return ""
+
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List, Dict
@@ -32,18 +32,22 @@ async def log_proctoring_event(
     if attempt["student_id"] != current_user.id and current_user.role not in ["admin"]:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    now = datetime.now(timezone.utc)
+    event_time = payload.timestamp or now
+    if hasattr(event_time, "tzinfo") and event_time.tzinfo is None:
+        event_time = event_time.replace(tzinfo=timezone.utc)
+
     screenshot_path = None
     if payload.screenshot_base64:
         screenshot_path = save_evidence_snapshot(
             image_base64=payload.screenshot_base64,
             attempt_id=attempt["id"],
             event_type=payload.event_type,
-            severity=payload.severity
+            severity=payload.severity,
+            event_time=event_time
         )
 
     new_event_id = await get_next_sequence("proctoring_event_id", db)
-    now = datetime.utcnow()
-    event_time = payload.timestamp or now
 
     event_doc = {
         "id": new_event_id,
@@ -59,6 +63,7 @@ async def log_proctoring_event(
         "created_at": now
     }
     await db["proctoring_incidents"].insert_one(event_doc)
+
 
     # Recalculate attempt integrity score
     cursor = db["proctoring_incidents"].find({"attempt_id": attempt["id"]})
@@ -132,7 +137,7 @@ async def get_proctoring_summary(
                 description=ev.get("description"),
                 screenshot_path=ev.get("screenshot_path"),
                 resolved=ev.get("resolved", False),
-                created_at=ev.get("created_at", datetime.utcnow())
+                created_at=ev.get("created_at", datetime.now(timezone.utc))
             )
         )
 

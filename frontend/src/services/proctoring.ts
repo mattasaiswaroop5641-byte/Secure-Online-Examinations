@@ -9,12 +9,14 @@ export const proctoringService = {
     duration_seconds?: number;
     description?: string;
     screenshot_base64?: string;
+    timestamp?: string;
   }): Promise<ProctoringEvent> {
     return apiRequest<ProctoringEvent>('/proctoring/events', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
+
 
   async getSummary(attemptId: number): Promise<ProctoringSummary> {
     return apiRequest<ProctoringSummary>(`/proctoring/${attemptId}`);
