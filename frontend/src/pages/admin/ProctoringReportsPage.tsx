@@ -1,0 +1,120 @@
+import React, { useState, useEffect } from 'react';
+import { ProctoringEvent, ViolationSeverity } from '../../types';
+import { ProctoringTimeline } from '../../components/admin/ProctoringTimeline';
+import { apiRequest } from '../../services/api';
+import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
+
+export const ProctoringReportsPage: React.FC = () => {
+  const [events, setEvents] = useState<ProctoringEvent[]>([]);
+  const [selectedSeverity, setSelectedSeverity] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadEvents = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch all attempts to gather all events or fetch dashboard metrics
+      const attempts = await apiRequest<any[]>('/attempts');
+      const allEvents: ProctoringEvent[] = [];
+
+      // Fetch proctoring summary for each attempt
+      for (const att of attempts) {
+        try {
+          const summary = await apiRequest<any>(`/proctoring/${att.id}`);
+          if (summary.events) {
+            allEvents.push(...summary.events);
+          }
+        } catch (e) {
+          // ignore individual attempt summary fetch errors
+        }
+      }
+
+      // Sort descending by timestamp
+      allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setEvents(allEvents);
+    } catch (err) {
+      console.error('Failed to load proctoring reports:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const filteredEvents = events.filter((ev) => {
+    const matchesSeverity = !selectedSeverity || ev.severity === selectedSeverity;
+    const matchesSearch =
+      !search ||
+      ev.event_type.toLowerCase().includes(search.toLowerCase()) ||
+      (ev.student_name && ev.student_name.toLowerCase().includes(search.toLowerCase())) ||
+      (ev.description && ev.description.toLowerCase().includes(search.toLowerCase()));
+    return matchesSeverity && matchesSearch;
+  });
+
+  return (
+    <div className="p-6 sm:p-8 space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-extrabold text-white tracking-tight">Proctoring Incident Center</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Continuous webcam audit records, computer vision forensic alerts, and screenshot evidence.
+          </p>
+        </div>
+
+        <span className="text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl font-semibold">
+          {events.length} Total Incident(s) Logged
+        </span>
+      </div>
+
+      {/* Filter Toolbar */}
+      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search incidents by event type, candidate, or keyword..."
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Filter className="w-4 h-4 text-slate-500" />
+          <select
+            value={selectedSeverity}
+            onChange={(e) => setSelectedSeverity(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="">All Severities</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-24 bg-slate-900 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <ProctoringTimeline
+          events={filteredEvents}
+          onEventResolved={(id) => {
+            setEvents((prev) =>
+              prev.map((e) => (e.id === id ? { ...e, resolved: true } : e))
+            );
+          }}
+        />
+      )}
+    </div>
+  );
+};

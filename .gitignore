@@ -1,0 +1,35 @@
+﻿# Dependencies
+node_modules/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build & cache outputs
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases & uploads
+*.db
+*.sqlite3
+backend/uploads/evidence/*
+!backend/uploads/evidence/.gitkeep
+backend/uploads/snapshots/*
+!backend/uploads/snapshots/.gitkeep
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
