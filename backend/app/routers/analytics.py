@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import Dict, Any, List
 
@@ -24,6 +24,7 @@ async def get_dashboard_metrics(
         attempts.append(a)
 
     total_attempts = len(attempts)
+    active_attempts = [a for a in attempts if a.get("status") == "in_progress"]
     completed_attempts = [a for a in attempts if a.get("status") in ["submitted", "timed_out"]]
     
     avg_score = 0.0
@@ -41,7 +42,7 @@ async def get_dashboard_metrics(
     violation_types_data = {v["_id"]: v["count"] for v in violation_counts if v.get("_id")}
 
     # Recent attempts
-    recent_attempts_cursor = db["attempts"].find({}).sort("id", -1).limit(8)
+    recent_attempts_cursor = db["attempts"].find({}).sort("id", -1).limit(10)
     recent_attempts = []
     async for att in recent_attempts_cursor:
         exam = await db["exams"].find_one({"id": att["exam_id"]})
@@ -69,6 +70,7 @@ async def get_dashboard_metrics(
             "total_exams": total_exams,
             "active_exams": active_exams,
             "total_attempts": total_attempts,
+            "active_attempts": len(active_attempts),
             "completed_attempts": len(completed_attempts),
             "average_score": avg_score,
             "suspicious_attempts": len(suspicious_attempts),
@@ -77,3 +79,4 @@ async def get_dashboard_metrics(
         "violation_breakdown": violation_types_data,
         "recent_attempts": recent_attempts
     }
+

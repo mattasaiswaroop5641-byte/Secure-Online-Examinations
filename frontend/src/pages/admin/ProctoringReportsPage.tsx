@@ -1,21 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ProctoringEvent, ViolationSeverity } from '../../types';
 import { ProctoringTimeline } from '../../components/admin/ProctoringTimeline';
 import { proctoringService } from '../../services/proctoring';
 import { apiRequest } from '../../services/api';
-import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
+import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle, Trash2, RefreshCw, Radio } from 'lucide-react';
 
 export const ProctoringReportsPage: React.FC = () => {
   const [events, setEvents] = useState<ProctoringEvent[]>([]);
   const [selectedSeverity, setSelectedSeverity] = useState<string>('');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLive, setIsLive] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const loadEvents = async () => {
-    setIsLoading(true);
+  const loadEvents = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsSyncing(true);
     try {
-      // Fetch all attempts to gather all events or fetch dashboard metrics
+      // Fetch all attempts to gather all events
       const attempts = await apiRequest<any[]>('/attempts');
       const allEvents: ProctoringEvent[] = [];
 
@@ -38,12 +40,23 @@ export const ProctoringReportsPage: React.FC = () => {
       console.error('Failed to load proctoring reports:', err);
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadEvents();
-  }, []);
+    loadEvents(false);
+  }, [loadEvents]);
+
+  // Live Auto-Refresh Stream (every 3.0s)
+  useEffect(() => {
+    if (!isLive) return;
+    const intervalId = setInterval(() => {
+      loadEvents(true);
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [isLive, loadEvents]);
 
   const handleClearAll = async () => {
     if (events.length === 0) return;
@@ -89,14 +102,36 @@ export const ProctoringReportsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-3">
+          {/* Live Ingestion Switch Badge */}
           <button
-            onClick={loadEvents}
-            disabled={isLoading}
+            onClick={() => setIsLive((prev) => !prev)}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+              isLive
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              {isLive && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  isLive ? 'bg-rose-500' : 'bg-slate-500'
+                }`}
+              />
+            </span>
+            <span>{isLive ? 'Live Ingestion (3s)' : 'Live Polling Paused'}</span>
+          </button>
+
+          <button
+            onClick={() => loadEvents(false)}
+            disabled={isSyncing}
             className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
             title="Refresh Incident Log"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-cyan-400' : ''}`} />
+            <span>Sync</span>
           </button>
 
           {events.length > 0 && (
@@ -146,7 +181,7 @@ export const ProctoringReportsPage: React.FC = () => {
       </div>
 
       {/* Timeline */}
-      {isLoading ? (
+      {isLoading && events.length === 0 ? (
         <div className="space-y-3">
           {[1, 2, 3].map((n) => (
             <div key={n} className="h-24 bg-slate-900 rounded-2xl animate-pulse" />
@@ -168,4 +203,5 @@ export const ProctoringReportsPage: React.FC = () => {
     </div>
   );
 };
+
 

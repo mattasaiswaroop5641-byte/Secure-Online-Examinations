@@ -195,11 +195,13 @@ export interface DashboardMetrics {
     total_exams: number;
     active_exams: number;
     total_attempts: number;
+    active_attempts?: number;
     completed_attempts: number;
     average_score: number;
     suspicious_attempts: number;
     total_violations: number;
   };
+
   violation_breakdown: Record<string, number>;
   recent_attempts: {
     id: number;
