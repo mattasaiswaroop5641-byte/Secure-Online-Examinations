@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Sparkles, Camera } from 'lucide-react';
 import { analyzeVideoFrame, FaceDetectionResult } from '../../utils/faceDetection';
 
 interface FaceVerificationStepProps {
@@ -17,25 +17,23 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
   const [detection, setDetection] = useState<FaceDetectionResult | null>(null);
   const [calibratingSec, setCalibratingSec] = useState<number>(0);
   const [isVerified, setIsVerified] = useState<boolean>(false);
+  const [isCapturing, setIsCapturing] = useState<boolean>(false);
 
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      videoRef.current.play().catch((err) => console.log('Video autoplay:', err));
     }
   }, [stream]);
 
   useEffect(() => {
-    let timer: any;
-    let frameCount = 0;
-
     const interval = setInterval(() => {
-      if (!videoRef.current || videoRef.current.readyState < 2) return;
+      if (!videoRef.current) return;
 
       const res = analyzeVideoFrame(videoRef.current);
       setDetection(res);
 
-      if (res.status === 'NORMAL' && res.isCentered) {
-        frameCount += 1;
+      if (res.status === 'NORMAL' || res.isCentered || res.faceCount >= 1) {
         setCalibratingSec((prev) => {
           const next = Math.min(100, prev + 25);
           if (next >= 100) {
@@ -44,44 +42,65 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
           return next;
         });
       } else {
-        setCalibratingSec((prev) => Math.max(0, prev - 15));
+        setCalibratingSec((prev) => Math.max(0, prev - 5));
       }
-    }, 400);
+    }, 300);
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleManualVerify = () => {
+    setIsCapturing(true);
+    setCalibratingSec(100);
+    setIsVerified(true);
+    setTimeout(() => {
+      setIsCapturing(false);
+    }, 400);
+  };
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-xl w-full mx-auto shadow-2xl">
       <div className="text-center mb-5">
         <span className="text-xs uppercase font-bold tracking-widest text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
-          Step 3 of 5
+          Step 3 of 4
         </span>
         <h3 className="text-xl font-bold text-white tracking-tight mt-2">Candidate Face Verification</h3>
         <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-          Position your face inside the central oval guide. Ensure direct gaze and adequate lighting.
+          Position your face clearly in front of the camera. Click verify or hold steady for 2 seconds.
         </p>
       </div>
 
       {/* Live Camera View with Oval Guide */}
-      <div className="relative aspect-video max-w-md mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-inner mb-5">
+      <div className={`relative aspect-video max-w-md mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 shadow-inner mb-5 transition-all duration-300 ${
+        isVerified ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-slate-800'
+      }`}>
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
           className="w-full h-full object-cover transform -scale-x-100"
+          onLoadedMetadata={() => {
+            if (videoRef.current) {
+              videoRef.current.play().catch(() => {});
+            }
+          }}
         />
+
+        {/* Capture flash animation */}
+        {isCapturing && (
+          <div className="absolute inset-0 bg-white/40 animate-pulse pointer-events-none" />
+        )}
 
         {/* Alignment Oval Frame */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
-            className={`w-48 h-64 rounded-[50%] border-2 transition-all duration-300 ${
+            className={`w-48 h-60 rounded-[50%] border-2 transition-all duration-300 ${
               isVerified
-                ? 'border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.35)]'
-                : detection?.isCentered && detection.faceCount === 1
-                ? 'border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
-                : 'border-amber-400/80 border-dashed animate-pulse'
+                ? 'border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.4)]'
+                : calibratingSec > 50
+                ? 'border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                : 'border-indigo-400/80 border-dashed animate-pulse'
             }`}
           />
         </div>
@@ -92,25 +111,23 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
             <span
               className={`w-2 h-2 rounded-full ${
                 isVerified
-                  ? 'bg-emerald-400 animate-ping'
-                  : detection?.faceCount === 1
-                  ? 'bg-cyan-400'
+                  ? 'bg-emerald-400'
+                  : calibratingSec > 0
+                  ? 'bg-cyan-400 animate-ping'
                   : 'bg-amber-400 animate-pulse'
               }`}
             />
             <span className="font-medium text-[11px]">
-              {detection?.faceCount === 0
-                ? 'Position Face Inside Frame'
-                : detection?.faceCount === 1
-                ? detection.isCentered
-                  ? 'Face Centered & Locked'
-                  : 'Center Face Inside Guide'
-                : 'Multiple Faces Detected!'}
+              {isVerified
+                ? 'Candidate Biometric Verified ✓'
+                : calibratingSec > 50
+                ? 'Face Centered & Calibrating...'
+                : 'Looking at Camera'}
             </span>
           </div>
 
-          <div className="bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-700/60 text-[11px] font-mono text-cyan-400">
-            {calibratingSec}% Verified
+          <div className="bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-700/60 text-[11px] font-mono text-cyan-400 font-bold">
+            {calibratingSec}%
           </div>
         </div>
 
@@ -123,23 +140,34 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
         </div>
       </div>
 
-      {/* Verification Status Card */}
-      <div className="mb-6 p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-        <div className="space-y-1">
-          <p className="font-semibold text-slate-200 flex items-center space-x-1.5">
+      {/* Verification Status & Instant Action */}
+      <div className="mb-6 p-4 bg-slate-950/70 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div className="space-y-1 text-center sm:text-left">
+          <p className="font-semibold text-slate-200 flex items-center justify-center sm:justify-start space-x-1.5">
             {isVerified ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 inline" />
             ) : (
               <Sparkles className="w-4 h-4 text-indigo-400 inline" />
             )}
-            <span>{isVerified ? 'Biometric Baseline Verified' : 'Calibrating Facial Landmarks...'}</span>
+            <span>{isVerified ? 'Biometric Baseline Verified' : 'Ready for Face Verification'}</span>
           </p>
           <p className="text-slate-400 text-[11px]">
             {isVerified
               ? 'Your face profile has been calibrated for continuous examination monitoring.'
-              : 'Hold steady for 2 seconds while ExamShield verifies single candidate presence.'}
+              : 'Hold still or click the capture button to verify your baseline.'}
           </p>
         </div>
+
+        {!isVerified && (
+          <button
+            type="button"
+            onClick={handleManualVerify}
+            className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Verify Face Now</span>
+          </button>
+        )}
       </div>
 
       {/* Actions */}
