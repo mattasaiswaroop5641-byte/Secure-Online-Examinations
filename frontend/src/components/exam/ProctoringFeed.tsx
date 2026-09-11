@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, AlertCircle, Eye, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Eye, ShieldAlert, Users } from 'lucide-react';
 import { FaceDetectionResult } from '../../utils/faceDetection';
 
 interface ProctoringFeedProps {
@@ -78,40 +78,80 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
         {/* Target Bounding Box Guide */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
-            className={`w-28 h-36 rounded-2xl border transition-all duration-300 ${
+            className={`w-32 h-40 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center justify-center p-2 text-center ${
               detection.status === 'NORMAL'
-                ? 'border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                ? 'border-emerald-500/70 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
                 : detection.status === 'MULTIPLE_FACES'
-                ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]'
-                : 'border-amber-400/80 border-dashed'
+                ? 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)] bg-rose-950/20 animate-pulse'
+                : detection.status === 'NO_FACE'
+                ? 'border-rose-500/80 border-dashed bg-rose-950/15 animate-pulse'
+                : 'border-amber-400/80 border-dashed bg-amber-950/10'
             }`}
-          />
+          >
+            {detection.status === 'NO_FACE' && (
+              <div className="text-rose-400 flex flex-col items-center space-y-1">
+                <ShieldAlert className="w-6 h-6 animate-bounce" />
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-slate-950/80 px-1.5 py-0.5 rounded">
+                  Face Not Detected
+                </span>
+              </div>
+            )}
+            {detection.status === 'MULTIPLE_FACES' && (
+              <div className="text-rose-300 flex flex-col items-center space-y-1">
+                <Users className="w-6 h-6 animate-ping" />
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-rose-950/90 px-1.5 py-0.5 rounded border border-rose-500/50">
+                  Multiple Faces
+                </span>
+              </div>
+            )}
+            {detection.status === 'LOOKING_AWAY' && (
+              <div className="text-amber-300 flex flex-col items-center space-y-1">
+                <Eye className="w-5 h-5 animate-pulse" />
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-slate-950/80 px-1.5 py-0.5 rounded">
+                  Looking {detection.lookingDirection}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Floating Real-Time Status Pill */}
         <div className="absolute bottom-2 inset-x-2 flex items-center justify-between pointer-events-none">
           <span
-            className={`px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-md border ${
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold backdrop-blur-md border shadow-md flex items-center space-x-1.5 ${
               detection.status === 'NORMAL'
-                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/30'
+                ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40'
                 : detection.status === 'MULTIPLE_FACES'
-                ? 'bg-rose-950/90 text-rose-200 border-rose-500/50'
-                : 'bg-amber-950/80 text-amber-200 border-amber-500/40'
+                ? 'bg-rose-950/95 text-rose-200 border-rose-500/60'
+                : detection.status === 'NO_FACE'
+                ? 'bg-rose-950/95 text-rose-200 border-rose-500/60'
+                : 'bg-amber-950/90 text-amber-200 border-amber-500/50'
             }`}
           >
-            {detection.status === 'NORMAL'
-              ? 'Candidate Centered'
-              : detection.status === 'NO_FACE'
-              ? 'No Face Visible'
-              : detection.status === 'MULTIPLE_FACES'
-              ? 'Multiple Faces!'
-              : detection.status === 'LOOKING_AWAY'
-              ? `Looking Away (${detection.lookingDirection})`
-              : 'Out of Position'}
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                detection.status === 'NORMAL'
+                  ? 'bg-emerald-400'
+                  : detection.status === 'NO_FACE' || detection.status === 'MULTIPLE_FACES'
+                  ? 'bg-rose-400 animate-ping'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span>
+              {detection.status === 'NORMAL'
+                ? 'Candidate Centered'
+                : detection.status === 'NO_FACE'
+                ? 'No Face Visible'
+                : detection.status === 'MULTIPLE_FACES'
+                ? `Multiple Faces (${detection.faceCount})`
+                : detection.status === 'LOOKING_AWAY'
+                ? `Looking Away (${detection.lookingDirection})`
+                : 'Out of Position'}
+            </span>
           </span>
 
           {violationCount > 0 && (
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/90 text-slate-300 border border-slate-700">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/90 text-rose-300 border border-rose-500/40">
               Violations: {violationCount}
             </span>
           )}

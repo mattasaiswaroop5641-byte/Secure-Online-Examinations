@@ -44,7 +44,9 @@ class FrameVerificationRequest(BaseModel):
 
 class FrameVerificationResponse(BaseModel):
     face_count: int
-    status: str  # OK, NO_FACE, MULTIPLE_FACES, ERROR
+    status: str  # OK, NO_FACE, MULTIPLE_FACES, LOOKING_AWAY, OUT_OF_FRAME, ERROR
     confidence: float
     message: str
+    is_centered: Optional[bool] = True
+    looking_direction: Optional[str] = "CENTER"
     bounding_boxes: Optional[List[Dict[str, int]]] = None

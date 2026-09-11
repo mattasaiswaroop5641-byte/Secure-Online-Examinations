@@ -171,7 +171,9 @@ def verify_frame(
         status=result["status"],
         confidence=result["confidence"],
         message=result["message"],
-        bounding_boxes=result["bounding_boxes"]
+        is_centered=result.get("is_centered", True),
+        looking_direction=result.get("looking_direction", "CENTER"),
+        bounding_boxes=result.get("bounding_boxes", [])
     )
 
 @router.put("/events/{event_id}/resolve")

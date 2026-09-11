@@ -61,8 +61,9 @@ export function useFaceProctor({
 
       const now = Date.now();
       const last = lastReportedTimeRef.current[eventType] || 0;
-      if (now - last < 5000) {
-        // Debounce reports of identical violation within 5s
+      const debounceWindow = eventType === 'TAB_SWITCH' ? 3000 : 4500;
+      if (now - last < debounceWindow) {
+        // Debounce reports of identical violation within debounce window
         return;
       }
       lastReportedTimeRef.current[eventType] = now;
@@ -136,18 +137,18 @@ export function useFaceProctor({
 
         const TICK_SEC = 0.5;
 
-        // 1. NO_FACE check (Calibrated: Warning = 2.5s, Violation = 6s)
+        // 1. NO_FACE check (Calibrated: Warning = 2.5s, Violation = 5s)
         if (res.status === 'NO_FACE') {
           noFaceDurationRef.current += TICK_SEC;
-          if (noFaceDurationRef.current >= 2.5 && noFaceDurationRef.current < 6.0) {
+          if (noFaceDurationRef.current >= 2.5 && noFaceDurationRef.current < 5.0) {
             setWarningMessage('⚠️ Warning: Face not visible. Position your face in front of the camera.');
-          } else if (noFaceDurationRef.current >= 6.0) {
+          } else if (noFaceDurationRef.current >= 5.0) {
             setWarningMessage('❌ Violation Logged: Candidate absence from examination camera.');
             reportViolation(
               'NO_FACE_DETECTED',
               'HIGH',
               noFaceDurationRef.current,
-              'No candidate face detected in camera viewport for over 6 seconds.'
+              'No candidate face detected in camera viewport for over 5 seconds.'
             );
           }
         } else {

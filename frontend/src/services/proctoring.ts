@@ -27,6 +27,8 @@ export const proctoringService = {
     status: string;
     confidence: number;
     message: string;
+    is_centered?: boolean;
+    looking_direction?: 'CENTER' | 'LEFT' | 'RIGHT' | 'DOWN' | 'UP';
     bounding_boxes?: { x: number; y: number; width: number; height: number }[];
   }> {
     return apiRequest('/proctoring/verify-frame', {

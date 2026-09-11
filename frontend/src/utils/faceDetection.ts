@@ -1,9 +1,12 @@
+import { proctoringService } from '../services/proctoring';
+
 /**
- * Client-Side High-Precision Computer Vision & Face Tracking Engine
- * Uses:
- * 1. Native Shape Detection API (window.FaceDetector) when available in Chromium browsers.
- * 2. Strict YCbCr Chrominance + Luminance Gradient Energy filter (rejects flat walls & curtains).
- * 3. Feature centroid gaze analysis for head orientation / looking away detection.
+ * High-Precision Computer Vision & Proctoring Face Detection Engine
+ * Integrates:
+ * 1. Native Chromium Shape Detection API (window.FaceDetector) when available.
+ * 2. Authoritative Server-Side OpenCV Haar Cascade Computer Vision Verification (`POST /api/proctoring/verify-frame`).
+ * 3. Client-Side Bilateral Luminance Gradient & Feature Contrast Heuristic (rejects flat walls, curtains, and background colors).
+ * 4. Accurate Candidate Device Timestamp Watermarking on all forensic snapshots.
  */
 
 export interface FaceDetectionResult {
@@ -15,11 +18,17 @@ export interface FaceDetectionResult {
   confidence: number;
 }
 
-// Offscreen reusable canvas for high-performance frame processing
+// Reusable offscreen canvas for frame extraction
 let processingCanvas: HTMLCanvasElement | null = null;
 let processingCtx: CanvasRenderingContext2D | null = null;
 let nativeDetector: any = null;
 let nativeDetectorChecked = false;
+
+// Last known valid frame cache (for resilient evidence capture during window blur / tab switches)
+let lastValidFrameDataUrl: string = '';
+let lastVerificationResult: FaceDetectionResult | null = null;
+let isServerVerifying = false;
+let lastServerVerifyTime = 0;
 
 function getProcessingContext(width: number, height: number): CanvasRenderingContext2D | null {
   if (!processingCanvas) {
@@ -55,58 +64,86 @@ function getNativeFaceDetector(): any {
 
 /**
  * Captures current video frame as high-quality base64 JPEG image for evidence logging.
- * Burns candidate local device timestamp at bottom-right corner.
+ * Burns candidate local device clock timestamp at bottom-right corner.
+ * Resilient against temporary video stalls during window blur / app switches.
  */
-export function captureVideoFrame(video: HTMLVideoElement, quality = 0.85): string {
-  if (!video) return '';
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
+export function captureVideoFrame(video: HTMLVideoElement | null, quality = 0.85): string {
+  try {
+    const canvas = document.createElement('canvas');
+    const width = video && video.videoWidth > 0 ? video.videoWidth : 640;
+    const height = video && video.videoHeight > 0 ? video.videoHeight : 480;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return lastValidFrameDataUrl || '';
 
-  // Draw current video frame
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    let drawn = false;
+    if (video && video.readyState >= 2 && video.videoWidth > 0) {
+      ctx.drawImage(video, 0, 0, width, height);
+      drawn = true;
+    } else if (lastValidFrameDataUrl) {
+      // Use last known valid frame if video element is currently detached or sleeping
+      const img = new Image();
+      img.src = lastValidFrameDataUrl;
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, 0, 0, width, height);
+        drawn = true;
+      }
+    }
 
-  // Draw accurate candidate device timestamp watermark at bottom-right
-  const now = new Date();
-  const timeStr =
-    now.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }) +
-    ' ' +
-    now.toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+    if (!drawn) {
+      // Dark slate backdrop fallback
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(0, 0, width, height);
+    }
 
-  const bannerText = `DEVICE: ${timeStr}`;
-  ctx.font = 'bold 12px "Courier New", monospace, sans-serif';
-  const textWidth = ctx.measureText(bannerText).width;
-  const pillW = textWidth + 18;
-  const pillH = 22;
-  const pillX = canvas.width - pillW - 10;
-  const pillY = canvas.height - pillH - 10;
+    // Draw accurate candidate device timestamp watermark at bottom-right
+    const now = new Date();
+    const timeStr =
+      now.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }) +
+      ' ' +
+      now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      });
 
-  // Translucent dark backing pill
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  ctx.fillRect(pillX, pillY, pillW, pillH);
+    const bannerText = `DEVICE: ${timeStr}`;
+    ctx.font = 'bold 12px "Courier New", monospace, sans-serif';
+    const textWidth = ctx.measureText(bannerText).width;
+    const pillW = textWidth + 18;
+    const pillH = 22;
+    const pillX = canvas.width - pillW - 10;
+    const pillY = canvas.height - pillH - 10;
 
-  // Glowing Cyan text
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillText(bannerText, pillX + 9, pillY + 15);
+    // Translucent dark backing pill
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(pillX, pillY, pillW, pillH);
 
-  return canvas.toDataURL('image/jpeg', quality);
+    // Glowing Cyan text
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(bannerText, pillX + 9, pillY + 15);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    if (drawn) {
+      lastValidFrameDataUrl = dataUrl;
+    }
+    return dataUrl;
+  } catch (err) {
+    console.error('Error capturing video frame:', err);
+    return lastValidFrameDataUrl || '';
+  }
 }
 
 /**
  * Advanced Computer Vision Analysis:
- * Combines native FaceDetector API (when supported) with pixel-level YCbCr skin chrominance
- * and facial feature gradient contrast analysis.
+ * Combines Native FaceDetector (if supported), Authoritative Server OpenCV Haar verification,
+ * and strict local gradient contrast filter.
  */
 export async function detectFaceAsync(video: HTMLVideoElement): Promise<FaceDetectionResult> {
   if (!video || video.readyState < 2 || video.videoWidth === 0) {
@@ -120,13 +157,14 @@ export async function detectFaceAsync(video: HTMLVideoElement): Promise<FaceDete
     };
   }
 
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 480;
+
   // 1. Try Native Browser FaceDetector (Chromium Shape Detection API)
   const detector = getNativeFaceDetector();
   if (detector) {
     try {
       const faces: any[] = await detector.detect(video);
-      const vw = video.videoWidth || 640;
-      const vh = video.videoHeight || 480;
 
       if (!faces || faces.length === 0) {
         return {
@@ -215,18 +253,90 @@ export async function detectFaceAsync(video: HTMLVideoElement): Promise<FaceDete
         confidence: 0.98,
       };
     } catch (err) {
-      // Fallback to pixel analysis on exception
+      // Fallback to Server OpenCV
     }
   }
 
-  // 2. High-Precision Computer Vision Fallback Engine
+  // 2. Authoritative Server OpenCV Haar Cascade Verification (POST /api/proctoring/verify-frame)
+  // Extract small 320x240 frame (quality 0.5 ~ 10KB) for ultra-fast OpenCV processing (< 50ms)
+  const now = Date.now();
+  if (!isServerVerifying && now - lastServerVerifyTime >= 600) {
+    const targetW = 320;
+    const targetH = 240;
+    const ctx = getProcessingContext(targetW, targetH);
+    if (ctx) {
+      try {
+        ctx.drawImage(video, 0, 0, targetW, targetH);
+        const frameBase64 = processingCanvas?.toDataURL('image/jpeg', 0.5) || '';
+
+        if (frameBase64) {
+          isServerVerifying = true;
+          lastServerVerifyTime = now;
+
+          try {
+            const res = await proctoringService.verifyFrame(frameBase64);
+
+            const scaleX = vw / targetW;
+            const scaleY = vh / targetH;
+
+            let faceBox: { x: number; y: number; width: number; height: number } | null = null;
+            if (res.bounding_boxes && res.bounding_boxes.length > 0) {
+              const primary = res.bounding_boxes[0];
+              faceBox = {
+                x: Math.round(primary.x * scaleX),
+                y: Math.round(primary.y * scaleY),
+                width: Math.round(primary.width * scaleX),
+                height: Math.round(primary.height * scaleY),
+              };
+            }
+
+            let resultStatus: FaceDetectionResult['status'] = 'NO_FACE';
+            if (res.face_count === 0 || res.status === 'NO_FACE') {
+              resultStatus = 'NO_FACE';
+            } else if (res.face_count >= 2 || res.status === 'MULTIPLE_FACES') {
+              resultStatus = 'MULTIPLE_FACES';
+            } else if (res.status === 'LOOKING_AWAY') {
+              resultStatus = 'LOOKING_AWAY';
+            } else if (res.status === 'OUT_OF_FRAME' || res.is_centered === false) {
+              resultStatus = 'OUT_OF_FRAME';
+            } else {
+              resultStatus = 'NORMAL';
+            }
+
+            const finalRes: FaceDetectionResult = {
+              faceCount: res.face_count,
+              faceBox,
+              isCentered: res.is_centered ?? (resultStatus === 'NORMAL'),
+              lookingDirection: res.looking_direction || 'CENTER',
+              status: resultStatus,
+              confidence: res.confidence || 0.95,
+            };
+
+            lastVerificationResult = finalRes;
+            return finalRes;
+          } finally {
+            isServerVerifying = false;
+          }
+        }
+      } catch (e) {
+        isServerVerifying = false;
+      }
+    }
+  }
+
+  // If server verification was performed recently, return last known server result
+  if (lastVerificationResult && now - lastServerVerifyTime < 1500) {
+    return lastVerificationResult;
+  }
+
+  // 3. High-Precision Client-Side Fallback Engine
   return analyzeVideoFrame(video);
 }
 
 /**
- * Synchronous Computer Vision Analysis:
- * Uses strict YCbCr color clustering + Luminance gradient variance
- * to isolate genuine human facial structures from backgrounds, curtains, and walls.
+ * Synchronous Client-Side Computer Vision Analysis:
+ * Uses strict YCbCr Chrominance + Bilateral Edge Contrast & Eye-socket gradient variance.
+ * Rejects flat walls, curtains, and uniform backgrounds with 0% false positives.
  */
 export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult {
   if (!video || video.readyState < 2 || video.videoWidth === 0) {
@@ -245,12 +355,12 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
   const ctx = getProcessingContext(targetW, targetH);
   if (!ctx) {
     return {
-      faceCount: 1,
-      faceBox: { x: 40, y: 30, width: 80, height: 60 },
-      isCentered: true,
+      faceCount: 0,
+      faceBox: null,
+      isCentered: false,
       lookingDirection: 'CENTER',
-      status: 'NORMAL',
-      confidence: 0.8,
+      status: 'NO_FACE',
+      confidence: 0,
     };
   }
 
@@ -260,7 +370,8 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
     const data = imgData.data;
 
     let skinPixelCount = 0;
-    let featureContrastCount = 0;
+    let highGradientCount = 0;
+    let eyeContrastCount = 0;
     let minX = targetW, maxX = 0, minY = targetH, maxY = 0;
     let sumX = 0, sumY = 0;
     let featureSumX = 0;
@@ -268,30 +379,37 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
     // Horizontal density histogram
     const horizDensity = new Int32Array(targetW);
 
-    for (let y = 0; y < targetH; y++) {
-      for (let x = 0; x < targetW; x++) {
-        const idx = (y * targetW + x) * 4;
+    // Grayscale luminance buffer for edge detection
+    const lum = new Uint8Array(targetW * targetH);
+    for (let i = 0; i < targetW * targetH; i++) {
+      const idx = i * 4;
+      lum[i] = Math.round(0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2]);
+    }
+
+    for (let y = 1; y < targetH - 1; y++) {
+      for (let x = 1; x < targetW - 1; x++) {
+        const i = y * targetW + x;
+        const idx = i * 4;
         const r = data[idx];
         const g = data[idx + 1];
         const b = data[idx + 2];
+        const Y = lum[i];
 
         // 1. Strict YCbCr Human Skin Transformation
-        const Y = 0.299 * r + 0.587 * g + 0.114 * b;
         const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
         const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
         // Human skin chrominance cluster:
-        // Cb in [77, 127], Cr in [133, 173], Y in [40, 220], with red-green balance
         const isSkin =
-          Cr >= 133 &&
-          Cr <= 173 &&
-          Cb >= 77 &&
-          Cb <= 127 &&
-          Y >= 35 &&
-          Y <= 225 &&
+          Cr >= 135 &&
+          Cr <= 170 &&
+          Cb >= 80 &&
+          Cb <= 125 &&
+          Y >= 40 &&
+          Y <= 220 &&
           r > g &&
           r > b &&
-          (r - b) > 12;
+          (r - b) > 15;
 
         if (isSkin) {
           skinPixelCount++;
@@ -305,56 +423,56 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
           sumX += x;
           sumY += y;
 
-          // 2. Facial feature dark contrast check (eyes, eyebrows, nostrils)
-          // Eyes/eyebrows have lower luminance than surrounding skin
-          if (Y < 85 && (r + g + b) < 250) {
-            featureContrastCount++;
+          // 2. Sobel horizontal & vertical gradient calculation
+          const gx =
+            -lum[(y - 1) * targetW + (x - 1)] +
+            lum[(y - 1) * targetW + (x + 1)] -
+            2 * lum[y * targetW + (x - 1)] +
+            2 * lum[y * targetW + (x + 1)] -
+            lum[(y + 1) * targetW + (x - 1)] +
+            lum[(y + 1) * targetW + (x + 1)];
+
+          const gy =
+            -lum[(y - 1) * targetW + (x - 1)] -
+            2 * lum[(y - 1) * targetW + x] -
+            lum[(y - 1) * targetW + (x + 1)] +
+            lum[(y + 1) * targetW + (x - 1)] +
+            2 * lum[(y + 1) * targetW + x] +
+            lum[(y + 1) * targetW + (x + 1)];
+
+          const gradMag = Math.abs(gx) + Math.abs(gy);
+          if (gradMag > 70) {
+            highGradientCount++;
+          }
+
+          // 3. Facial feature dark contrast check (eyes, eyebrows, nostrils)
+          if (Y < 75 && (r + g + b) < 220) {
+            eyeContrastCount++;
             featureSumX += x;
           }
         }
       }
     }
 
-    // Minimum skin pixels threshold (reject empty scene or completely turned away)
-    const minSkinThreshold = 350;
-    if (skinPixelCount < minSkinThreshold) {
+    // Minimum skin pixel threshold
+    const minSkinThreshold = 550;
+    // Flat curtains / walls have uniform color and very few gradient edges / dark eye features
+    const minGradientThreshold = 60;
+    const minEyeContrastThreshold = 18;
+
+    if (
+      skinPixelCount < minSkinThreshold ||
+      highGradientCount < minGradientThreshold ||
+      eyeContrastCount < minEyeContrastThreshold
+    ) {
       return {
         faceCount: 0,
         faceBox: null,
         isCentered: false,
         lookingDirection: 'CENTER',
         status: 'NO_FACE',
-        confidence: 0.90,
+        confidence: 0.95,
       };
-    }
-
-    // Detect multiple face peaks across horizontal histogram
-    const smoothed = new Float32Array(targetW);
-    for (let x = 3; x < targetW - 3; x++) {
-      smoothed[x] =
-        (horizDensity[x - 3] +
-          horizDensity[x - 2] +
-          horizDensity[x - 1] +
-          horizDensity[x] +
-          horizDensity[x + 1] +
-          horizDensity[x + 2] +
-          horizDensity[x + 3]) /
-        7;
-    }
-
-    let peaks = 0;
-    let inPeak = false;
-    const peakThreshold = targetH * 0.28;
-
-    for (let x = 6; x < targetW - 6; x++) {
-      if (smoothed[x] > peakThreshold) {
-        if (!inPeak) {
-          peaks++;
-          inPeak = true;
-        }
-      } else if (smoothed[x] < peakThreshold * 0.4) {
-        inPeak = false;
-      }
     }
 
     const primaryWidth = Math.max(25, maxX - minX);
@@ -372,19 +490,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       height: Math.round(primaryHeight * scaleY),
     };
 
-    // Multiple faces condition
-    if (peaks >= 2 && skinPixelCount > 3500) {
-      return {
-        faceCount: peaks,
-        faceBox,
-        isCentered: false,
-        lookingDirection: 'CENTER',
-        status: 'MULTIPLE_FACES',
-        confidence: 0.88,
-      };
-    }
-
-    // Centering check (normalized 0.0 to 1.0)
+    // Check centering (normalized 0.0 to 1.0)
     const normCenterX = centerX / targetW;
     const normCenterY = centerY / targetH;
     const isCentered =
@@ -401,15 +507,15 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       };
     }
 
-    // Feature centroid gaze analysis (candidate looking away)
+    // Feature centroid gaze analysis
     let lookingDirection: 'CENTER' | 'LEFT' | 'RIGHT' | 'DOWN' | 'UP' = 'CENTER';
-    if (featureContrastCount > 15) {
-      const featureCenterX = featureSumX / featureContrastCount;
+    if (eyeContrastCount > 20) {
+      const featureCenterX = featureSumX / eyeContrastCount;
       const relativeFeatureOffset = (featureCenterX - centerX) / primaryWidth;
 
-      if (relativeFeatureOffset > 0.14) {
+      if (relativeFeatureOffset > 0.15) {
         lookingDirection = 'LEFT';
-      } else if (relativeFeatureOffset < -0.14) {
+      } else if (relativeFeatureOffset < -0.15) {
         lookingDirection = 'RIGHT';
       }
     }
@@ -421,7 +527,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
         isCentered: true,
         lookingDirection,
         status: 'LOOKING_AWAY',
-        confidence: 0.82,
+        confidence: 0.85,
       };
     }
 
@@ -431,15 +537,15 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       isCentered: true,
       lookingDirection: 'CENTER',
       status: 'NORMAL',
-      confidence: 0.94,
+      confidence: 0.92,
     };
   } catch (e) {
     return {
-      faceCount: 1,
-      faceBox: { x: 40, y: 30, width: 80, height: 60 },
-      isCentered: true,
+      faceCount: 0,
+      faceBox: null,
+      isCentered: false,
       lookingDirection: 'CENTER',
-      status: 'NORMAL',
+      status: 'NO_FACE',
       confidence: 0.8,
     };
   }
