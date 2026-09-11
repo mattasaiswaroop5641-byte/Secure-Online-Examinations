@@ -65,8 +65,12 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
           autoPlay
           playsInline
           muted
+          onLoadedMetadata={(e) => {
+            (e.target as HTMLVideoElement).play().catch(() => {});
+          }}
           className="w-full h-full object-cover transform -scale-x-100"
         />
+
 
         {/* Subtle Scanning Radar Beam */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-cyan-500/10 to-transparent h-12 w-full animate-scan" />

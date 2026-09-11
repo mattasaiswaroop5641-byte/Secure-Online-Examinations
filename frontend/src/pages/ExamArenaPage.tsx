@@ -43,12 +43,39 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [autoSubmitNotice, setAutoSubmitNotice] = useState<string | null>(null);
 
-  // Attach webcam stream to ref
+  // Attach webcam stream to ref once UI is loaded and videoRef is mounted
   useEffect(() => {
-    if (videoRef.current && mediaStream) {
-      videoRef.current.srcObject = mediaStream;
+    let activeStream = mediaStream;
+
+    async function attachStream() {
+      if (!isLoading && videoRef.current) {
+        const isAlive = Boolean(
+          activeStream &&
+          activeStream.active &&
+          activeStream.getVideoTracks().some((t) => t.readyState === 'live')
+        );
+
+        if (!isAlive) {
+          try {
+            activeStream = await navigator.mediaDevices.getUserMedia({
+              video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+              audio: false,
+            });
+          } catch (e) {
+            console.error('Camera acquisition error in ExamArenaPage:', e);
+          }
+        }
+
+        if (videoRef.current && activeStream) {
+          videoRef.current.srcObject = activeStream;
+          videoRef.current.play().catch((err) => console.log('Arena video play:', err));
+        }
+      }
     }
-  }, [mediaStream]);
+
+    attachStream();
+  }, [isLoading, mediaStream]);
+
 
   // Load / Start attempt
   useEffect(() => {
