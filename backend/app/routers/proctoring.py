@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List, Dict
@@ -180,3 +180,70 @@ async def resolve_proctoring_event(
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")
     return {"status": "resolved", "event_id": event_id}
+
+@router.delete("/events/{event_id}")
+async def delete_proctoring_event(
+    event_id: int,
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Admin / Examiner delete an individual proctoring incident."""
+    event = await db["proctoring_incidents"].find_one({"id": event_id})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    attempt_id = event.get("attempt_id")
+    await db["proctoring_incidents"].delete_one({"id": event_id})
+
+    # Recalculate attempt integrity score
+    if attempt_id:
+        cursor = db["proctoring_incidents"].find({"attempt_id": attempt_id})
+        all_events = []
+        async for ev in cursor:
+            all_events.append(ev)
+        
+        proc_info = calculate_proctoring_score(all_events)
+        await db["attempts"].update_one(
+            {"id": attempt_id},
+            {"$set": {
+                "proctoring_score": proc_info["score"],
+                "violation_count": proc_info["violations_count"]
+            }}
+        )
+
+    return {"status": "deleted", "event_id": event_id}
+
+@router.delete("/events")
+async def clear_proctoring_events(
+    attempt_id: int = None,
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Admin / Examiner delete all incidents or incidents for a specific attempt."""
+    query = {}
+    if attempt_id is not None:
+        query["attempt_id"] = attempt_id
+        affected_attempt_ids = [attempt_id]
+    else:
+        affected_attempt_ids = await db["proctoring_incidents"].distinct("attempt_id")
+
+    res = await db["proctoring_incidents"].delete_many(query)
+
+    # Recalculate attempt integrity score for affected attempts
+    for att_id in affected_attempt_ids:
+        cursor = db["proctoring_incidents"].find({"attempt_id": att_id})
+        all_events = []
+        async for ev in cursor:
+            all_events.append(ev)
+        
+        proc_info = calculate_proctoring_score(all_events)
+        await db["attempts"].update_one(
+            {"id": att_id},
+            {"$set": {
+                "proctoring_score": proc_info["score"],
+                "violation_count": proc_info["violations_count"]
+            }}
+        )
+
+    return {"status": "cleared", "deleted_count": res.deleted_count}
+

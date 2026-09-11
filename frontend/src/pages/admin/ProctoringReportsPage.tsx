@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { ProctoringEvent, ViolationSeverity } from '../../types';
 import { ProctoringTimeline } from '../../components/admin/ProctoringTimeline';
+import { proctoringService } from '../../services/proctoring';
 import { apiRequest } from '../../services/api';
-import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
 
 export const ProctoringReportsPage: React.FC = () => {
   const [events, setEvents] = useState<ProctoringEvent[]>([]);
   const [selectedSeverity, setSelectedSeverity] = useState<string>('');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
 
   const loadEvents = async () => {
     setIsLoading(true);
@@ -43,6 +45,28 @@ export const ProctoringReportsPage: React.FC = () => {
     loadEvents();
   }, []);
 
+  const handleClearAll = async () => {
+    if (events.length === 0) return;
+    if (
+      !window.confirm(
+        'Are you sure you want to permanently delete ALL recorded proctoring incidents across all candidates? This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setIsClearing(true);
+    try {
+      await proctoringService.clearEvents();
+      setEvents([]);
+    } catch (err) {
+      console.error('Failed to clear proctoring events:', err);
+      alert('Failed to clear incidents: ' + (err as Error).message);
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   const filteredEvents = events.filter((ev) => {
     const matchesSeverity = !selectedSeverity || ev.severity === selectedSeverity;
     const matchesSearch =
@@ -64,9 +88,32 @@ export const ProctoringReportsPage: React.FC = () => {
           </p>
         </div>
 
-        <span className="text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl font-semibold">
-          {events.length} Total Incident(s) Logged
-        </span>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={loadEvents}
+            disabled={isLoading}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            title="Refresh Incident Log"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+
+          {events.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              disabled={isClearing}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isClearing ? 'Clearing...' : 'Clear All Incidents'}</span>
+            </button>
+          )}
+
+          <span className="text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl font-semibold">
+            {events.length} Total Incident(s) Logged
+          </span>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -113,8 +160,12 @@ export const ProctoringReportsPage: React.FC = () => {
               prev.map((e) => (e.id === id ? { ...e, resolved: true } : e))
             );
           }}
+          onEventDeleted={(id) => {
+            setEvents((prev) => prev.filter((e) => e.id !== id));
+          }}
         />
       )}
     </div>
   );
 };
+

@@ -11,6 +11,7 @@ import {
   Image,
   CheckCircle2,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { proctoringService } from '../../services/proctoring';
 import { EvidenceViewerModal } from './EvidenceViewerModal';
@@ -18,6 +19,7 @@ import { EvidenceViewerModal } from './EvidenceViewerModal';
 interface ProctoringTimelineProps {
   events: ProctoringEvent[];
   onEventResolved?: (eventId: number) => void;
+  onEventDeleted?: (eventId: number) => void;
 }
 
 const eventIconMap: Record<string, any> = {
@@ -34,6 +36,7 @@ const eventIconMap: Record<string, any> = {
 export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
   events,
   onEventResolved,
+  onEventDeleted,
 }) => {
   const [selectedSnapshot, setSelectedSnapshot] = useState<{
     event: ProctoringEvent;
@@ -45,6 +48,19 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
       if (onEventResolved) onEventResolved(eventId);
     } catch (err) {
       console.error('Failed to resolve incident:', err);
+    }
+  };
+
+  const handleDelete = async (eventId: number) => {
+    if (!window.confirm('Are you sure you want to delete this proctoring incident log? This will update candidate metrics.')) {
+      return;
+    }
+    try {
+      await proctoringService.deleteEvent(eventId);
+      if (onEventDeleted) onEventDeleted(eventId);
+    } catch (err) {
+      console.error('Failed to delete incident:', err);
+      alert('Failed to delete incident: ' + (err as Error).message);
     }
   };
 
@@ -113,7 +129,7 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
               {ev.screenshot_path && (
                 <button
                   onClick={() => setSelectedSnapshot({ event: ev })}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-colors"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Image className="w-3.5 h-3.5" />
                   <span>View Evidence</span>
@@ -128,11 +144,19 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
               ) : (
                 <button
                   onClick={() => handleResolve(ev.id)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-300 hover:border-emerald-500/30 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-300 hover:border-emerald-500/30 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Mark Resolved
                 </button>
               )}
+
+              <button
+                onClick={() => handleDelete(ev.id)}
+                title="Delete this incident"
+                className="p-1.5 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 text-slate-400 border border-slate-700 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
         );
@@ -146,6 +170,10 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
           event={selectedSnapshot.event}
           onResolve={() => {
             handleResolve(selectedSnapshot.event.id);
+            setSelectedSnapshot(null);
+          }}
+          onDelete={() => {
+            handleDelete(selectedSnapshot.event.id);
             setSelectedSnapshot(null);
           }}
         />

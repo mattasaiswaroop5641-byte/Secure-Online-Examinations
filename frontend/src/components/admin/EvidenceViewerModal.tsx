@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { ProctoringEvent } from '../../types';
 import { formatDate, getSeverityBadgeClass } from '../../utils/formatters';
-import { ShieldAlert, CheckCircle2, Download, Info, Camera, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Download, Info, Camera, AlertTriangle, Trash2 } from 'lucide-react';
 
 interface EvidenceViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: ProctoringEvent;
   onResolve: () => void;
+  onDelete?: () => void;
 }
 
 export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
@@ -16,7 +17,9 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
   onClose,
   event,
   onResolve,
+  onDelete,
 }) => {
+
   const [imageFailed, setImageFailed] = useState<boolean>(false);
 
   const backendUrl = import.meta.env.VITE_API_BASE_URL
@@ -114,12 +117,23 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-          >
-            Close
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Record</span>
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center space-x-3">
             {event.resolved ? (

@@ -38,4 +38,18 @@ export const proctoringService = {
       method: 'PUT',
     });
   },
+
+  async deleteEvent(eventId: number): Promise<{ status: string; event_id: number }> {
+    return apiRequest(`/proctoring/events/${eventId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async clearEvents(attemptId?: number): Promise<{ status: string; deleted_count: number }> {
+    const url = attemptId ? `/proctoring/events?attempt_id=${attemptId}` : '/proctoring/events';
+    return apiRequest(url, {
+      method: 'DELETE',
+    });
+  },
 };
+
