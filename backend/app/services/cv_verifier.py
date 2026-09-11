@@ -89,7 +89,8 @@ def save_evidence_snapshot(
 ) -> str:
     """
     Decodes an evidence frame, draws forensic bounding box annotations and a timestamp watermark,
-    saves the image in settings.EVIDENCE_DIR, and returns the relative URL path.
+    returns a high-reliability watermarked base64 Data URI stored directly in MongoDB Atlas,
+    and also writes to disk if available.
     """
     try:
         image = decode_base64_image(image_base64)
@@ -104,7 +105,7 @@ def save_evidence_snapshot(
         
         # Timestamp and watermark banner
         timestamp_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        banner_text = f"[ExamShield] {event_type} | {severity} | {timestamp_str}"
+        banner_text = f"[ExamShield Forensic] {event_type} | {severity} | {timestamp_str}"
         
         # Draw background bar for text
         cv2.rectangle(image, (0, 0), (image.shape[1], 28), (20, 20, 20), -1)
@@ -113,17 +114,28 @@ def save_evidence_snapshot(
             banner_text,
             (10, 18),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
+            0.45,
             (255, 255, 255),
             1,
             cv2.LINE_AA
         )
         
-        filename = f"attempt_{attempt_id}_{event_type.lower()}_{int(datetime.utcnow().timestamp())}.jpg"
-        file_path = settings.EVIDENCE_DIR / filename
-        cv2.imwrite(str(file_path), image)
-        
-        return f"/uploads/evidence/{filename}"
+        # Save to disk if writable
+        try:
+            filename = f"attempt_{attempt_id}_{event_type.lower()}_{int(datetime.utcnow().timestamp())}.jpg"
+            file_path = settings.EVIDENCE_DIR / filename
+            cv2.imwrite(str(file_path), image)
+        except Exception:
+            pass
+
+        # Return self-contained watermarked Data URI for permanent Atlas storage
+        success, buffer = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        if success:
+            b64_str = base64.b64encode(buffer).decode('utf-8')
+            return f"data:image/jpeg;base64,{b64_str}"
+            
+        return ""
     except Exception as e:
         print(f"Error saving evidence snapshot: {e}")
         return ""
+

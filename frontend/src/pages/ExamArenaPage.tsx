@@ -17,6 +17,7 @@ import {
   Eye,
   Lock,
   RotateCcw,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface ExamArenaPageProps {
@@ -42,6 +43,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [autoSubmitNotice, setAutoSubmitNotice] = useState<string | null>(null);
+  const [kickOutNotice, setKickOutNotice] = useState<string | null>(null);
 
   // Attach webcam stream to ref once UI is loaded and videoRef is mounted
   useEffect(() => {
@@ -76,7 +78,6 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
     attachStream();
   }, [isLoading, mediaStream]);
 
-
   // Load / Start attempt
   useEffect(() => {
     async function initExam() {
@@ -94,6 +95,25 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
     initExam();
   }, [examId]);
 
+  // Submission handler
+  const handleFinalSubmit = useCallback(async () => {
+    if (!examData || isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((t) => t.stop());
+      }
+
+      await attemptService.submitExam(examData.attempt_id);
+      onFinishExam(examData.attempt_id);
+    } catch (err: any) {
+      console.error('Submission failed:', err);
+      setErrorMessage(err.message || 'Failed to submit examination.');
+      setIsSubmitting(false);
+    }
+  }, [examData, isSubmitting, mediaStream, onFinishExam]);
+
   // Continuous Face Proctoring Hook
   const {
     detection,
@@ -104,7 +124,14 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   } = useFaceProctor({
     attemptId: examData?.attempt_id ?? null,
     videoRef,
-    isActive: !isLoading && Boolean(examData),
+    isActive: !isLoading && Boolean(examData) && !kickOutNotice,
+    maxViolationsAllowed: 3,
+    onAutoTerminate: (reason) => {
+      setKickOutNotice(reason);
+      setTimeout(() => {
+        handleFinalSubmit();
+      }, 3000);
+    },
   });
 
   // Anti-Cheating & Fullscreen Lockdown Hook
@@ -115,7 +142,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
     exitFullscreen,
     dismissFullscreenWarning,
   } = useAntiCheating({
-    isActive: !isLoading && Boolean(examData),
+    isActive: !isLoading && Boolean(examData) && !kickOutNotice,
     onViolation: (eventType, severity, desc) => {
       reportViolation(eventType, severity, 0, desc);
     },
@@ -130,7 +157,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
   // Save student answer in real time
   const handleSelectOption = async (optionId: number | null) => {
-    if (!examData) return;
+    if (!examData || kickOutNotice) return;
     const currentQ = examData.questions[currentQuestionIndex];
     const prevAnswer = answers[currentQ.id];
     const isMarked = prevAnswer?.is_marked_for_review ?? false;
@@ -160,7 +187,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   };
 
   const handleToggleMarkReview = async () => {
-    if (!examData) return;
+    if (!examData || kickOutNotice) return;
     const currentQ = examData.questions[currentQuestionIndex];
     const prevAnswer = answers[currentQ.id];
     const newMarked = !prevAnswer?.is_marked_for_review;
@@ -186,29 +213,6 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
       console.error('Failed to update review flag:', err);
     }
   };
-
-  // Submission handler
-  const handleFinalSubmit = useCallback(async () => {
-    if (!examData || isSubmitting) return;
-    setIsSubmitting(true);
-
-    try {
-      // Stop webcam stream tracks
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((t) => t.stop());
-      }
-      // Exit fullscreen mode
-      await exitFullscreen();
-
-      // Authoritative evaluation on backend
-      const result = await attemptService.submitExam(examData.attempt_id);
-      onFinishExam(result.attempt_id);
-    } catch (err: any) {
-      console.error('Submission failed:', err);
-      setErrorMessage(err.message || 'Failed to submit examination.');
-      setIsSubmitting(false);
-    }
-  }, [examData, isSubmitting, mediaStream, exitFullscreen, onFinishExam]);
 
   // Automatic timer timeout handler
   const handleTimerExpired = useCallback(async () => {
@@ -239,7 +243,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
           <p className="text-xs text-slate-400">{errorMessage || 'Could not connect to exam.'}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold"
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer"
           >
             Retry Connection
           </button>
@@ -255,9 +259,6 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col secure-exam-content select-none">
-      {/* Hidden/Hardware Video Element for CV tracking */}
-      <video ref={videoRef} autoPlay playsInline muted className="hidden" />
-
       {/* TOP ARENA BAR */}
       <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-30">
         {/* Left: Exam Title & Candidate */}
@@ -297,50 +298,74 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
         <div>
           <button
             onClick={() => setIsSubmitModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+            disabled={Boolean(kickOutNotice)}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
           >
             Submit Exam
           </button>
         </div>
       </header>
 
-      {/* Auto-Submit Notice Overlay Banner */}
-      {autoSubmitNotice && (
-        <div className="bg-rose-600 text-white px-4 py-2.5 text-center text-xs font-bold animate-pulse flex items-center justify-center space-x-2">
-          <AlertTriangle className="w-4 h-4" />
-          <span>{autoSubmitNotice}</span>
-        </div>
-      )}
-
-      {/* Urgent Fullscreen Exit Recovery Overlay */}
-      {fullscreenWarning && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95">
-            <div className="w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
-              <Maximize2 className="w-7 h-7" />
+      {/* AUTO-TERMINATION / KICK OUT OVERLAY */}
+      {kickOutNotice && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-slate-900 border-2 border-rose-500/60 rounded-3xl p-8 text-center space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-rose-500/10 border-2 border-rose-500/30 rounded-2xl flex items-center justify-center text-rose-400 mx-auto animate-bounce">
+              <ShieldAlert className="w-10 h-10" />
             </div>
-            <h3 className="text-lg font-bold text-white">Fullscreen Mode Exited!</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Exiting fullscreen violates the secure testing environment. This incident has been logged.
-              Please re-enter fullscreen immediately to continue your assessment.
+
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                Examination Terminated
+              </h2>
+              <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                Security Violation Threshold Exceeded
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-left leading-relaxed">
+              {kickOutNotice}
             </p>
-            <button
-              onClick={() => {
-                requestFullscreen();
-                dismissFullscreenWarning();
-              }}
-              className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-600/25 transition-all cursor-pointer"
-            >
-              Resume Fullscreen Examination
-            </button>
+
+            <div className="p-3 bg-rose-500/10 rounded-xl text-[11px] text-rose-300 flex items-center justify-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+              <span>All forensic snapshot frames have been logged to MongoDB Atlas Cloud.</span>
+            </div>
+
+            <div className="pt-2">
+              <p className="text-xs text-slate-500 animate-pulse">
+                Auto-submitting test and redirecting to integrity report...
+              </p>
+            </div>
           </div>
         </div>
       )}
 
+      {/* FULLSCREEN WARNING BANNER */}
+      {fullscreenWarning && !kickOutNotice && (
+        <div className="bg-rose-600/90 text-white px-4 py-2 text-xs flex items-center justify-between font-semibold sticky top-[57px] z-20 shadow-md">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 animate-bounce" />
+            <span>
+              Security Notice: Fullscreen mode is mandatory. Exiting fullscreen logs an incident in your audit report.
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              dismissFullscreenWarning();
+              requestFullscreen();
+            }}
+            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors shrink-0 ml-3"
+          >
+            Restore Fullscreen
+          </button>
+        </div>
+      )}
+
       {/* MAIN ARENA WORKSPACE */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
-        {/* Left / Center Area: Question Card */}
-        <div className="lg:col-span-8 flex flex-col h-full min-h-[500px]">
+      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* LEFT 2 COLS: QUESTION DISPLAY */}
+        <div className="lg:col-span-2 flex flex-col space-y-4">
           <QuestionCard
             question={currentQ}
             currentIndex={currentQuestionIndex}
@@ -348,12 +373,14 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
             currentAnswer={answers[currentQ.id]}
             onSelectOption={handleSelectOption}
             onToggleMarkReview={handleToggleMarkReview}
-            onPrevious={() => setCurrentQuestionIndex((prev) => Math.max(0, prev - 1))}
             onNext={() => {
               if (currentQuestionIndex < examData.questions.length - 1) {
                 setCurrentQuestionIndex((prev) => prev + 1);
-              } else {
-                setIsSubmitModalOpen(true);
+              }
+            }}
+            onPrevious={() => {
+              if (currentQuestionIndex > 0) {
+                setCurrentQuestionIndex((prev) => prev - 1);
               }
             }}
             hasPrevious={currentQuestionIndex > 0}
@@ -361,32 +388,28 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
           />
         </div>
 
-        {/* Right Area: Question Palette & Floating Proctoring Feed */}
-        <div className="lg:col-span-4 flex flex-col gap-5 h-full">
-          {/* Continuous Proctoring Live Webcam PiP */}
-          <div className="shrink-0">
-            <ProctoringFeed
-              videoRef={videoRef}
-              detection={detection}
-              trustScore={trustScore}
-              violationCount={violationCount}
-              warningMessage={warningMessage}
-            />
-          </div>
+        {/* RIGHT 1 COL: PROCTORING FEED & PALETTE */}
+        <div className="space-y-6 flex flex-col">
+          {/* Live Continuous Proctor Feed */}
+          <ProctoringFeed
+            videoRef={videoRef}
+            detection={detection}
+            trustScore={trustScore}
+            violationCount={violationCount}
+            warningMessage={warningMessage}
+          />
 
-          {/* Question Navigator Palette */}
-          <div className="flex-1 min-h-[280px]">
-            <QuestionPalette
-              questions={examData.questions}
-              currentIndex={currentQuestionIndex}
-              answers={answers}
-              onSelectQuestion={(idx) => setCurrentQuestionIndex(idx)}
-            />
-          </div>
+          {/* Question Status Palette */}
+          <QuestionPalette
+            questions={examData.questions}
+            currentIndex={currentQuestionIndex}
+            answers={answers}
+            onSelectQuestion={(idx) => setCurrentQuestionIndex(idx)}
+          />
         </div>
       </div>
 
-      {/* Submission Confirmation Modal */}
+      {/* SUBMISSION CONFIRMATION MODAL */}
       <SubmitConfirmModal
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
@@ -394,9 +417,10 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
         isSubmitting={isSubmitting}
         totalQuestions={examData.questions.length}
         answeredCount={answeredCount}
-        unansweredCount={unansweredCount}
         markedCount={markedCount}
+        unansweredCount={unansweredCount}
       />
+
     </div>
   );
 };
