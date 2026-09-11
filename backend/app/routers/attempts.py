@@ -1,15 +1,11 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 import random
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List, Optional, Dict
 
-from app.database import get_db
-from app.models.user import User
-from app.models.exam import Exam
-from app.models.question import Question, QuestionOption, ExamQuestion
-from app.models.attempt import ExamAttempt, StudentAnswer
-from app.models.proctoring import ProctoringEvent
+from app.mongodb import get_database, get_next_sequence
+from app.schemas.auth import UserResponse
 from app.schemas.attempt import (
     StartExamResponse, SaveAnswerRequest, TimeRemainingResponse,
     AttemptResultResponse, AttemptSummaryAdmin, QuestionAnalysisItem, AnswerState
@@ -21,81 +17,90 @@ from app.utils.security import get_current_user, require_role
 router = APIRouter(prefix="/attempts", tags=["Attempts & Submissions"])
 
 @router.post("/exams/{exam_id}/start", response_model=StartExamResponse)
-def start_exam_attempt(
+async def start_exam_attempt(
     exam_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """
-    Starts or resumes an examination attempt.
+    Starts or resumes an examination attempt in MongoDB.
     Returns student-safe question payloads (no correct answers / explanations),
     authoritative server-calculated deadline, and any previously saved answer state.
     """
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    exam = await db["exams"].find_one({"id": exam_id})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    if exam.status != "active":
-        raise HTTPException(status_code=400, detail=f"Exam is not currently active (status: {exam.status})")
+    if exam.get("status") != "active":
+        raise HTTPException(status_code=400, detail=f"Exam is not currently active (status: {exam.get('status')})")
 
     # Check for existing attempt
-    attempt = (
-        db.query(ExamAttempt)
-        .filter(ExamAttempt.exam_id == exam.id, ExamAttempt.student_id == current_user.id)
-        .order_by(ExamAttempt.id.desc())
-        .first()
+    attempt = await db["attempts"].find_one(
+        {"exam_id": exam["id"], "student_id": current_user.id},
+        sort=[("id", -1)]
     )
 
     now = datetime.utcnow()
+    duration_minutes = exam.get("duration_minutes", 60)
+
     if attempt:
-        if attempt.status in ["submitted", "timed_out"]:
+        if attempt.get("status") in ["submitted", "timed_out"]:
             raise HTTPException(status_code=400, detail="You have already completed and submitted this examination.")
         
         # Check if deadline passed
-        if attempt.end_time and now > attempt.end_time:
-            evaluate_attempt(attempt.id, db)
-            attempt.status = "timed_out"
-            db.commit()
+        end_time = attempt.get("end_time")
+        if end_time and now > end_time:
+            await evaluate_attempt(attempt["id"], db)
+            await db["attempts"].update_one({"id": attempt["id"]}, {"$set": {"status": "timed_out"}})
             raise HTTPException(status_code=400, detail="Examination time has expired.")
     else:
         # Create fresh attempt
-        end_time = now + timedelta(minutes=exam.duration_minutes)
-        attempt = ExamAttempt(
-            exam_id=exam.id,
-            student_id=current_user.id,
-            start_time=now,
-            end_time=end_time,
-            status="in_progress",
-            proctoring_score=100.0,
-            violation_count=0
-        )
-        db.add(attempt)
-        db.commit()
-        db.refresh(attempt)
+        end_time = now + timedelta(minutes=duration_minutes)
+        new_id = await get_next_sequence("attempt_id", db)
+        attempt = {
+            "id": new_id,
+            "exam_id": exam["id"],
+            "student_id": current_user.id,
+            "start_time": now,
+            "end_time": end_time,
+            "submitted_at": None,
+            "time_spent_seconds": 0,
+            "status": "in_progress",
+            "score": 0.0,
+            "total_possible_marks": float(exam.get("total_marks", 100.0)),
+            "percentage": 0.0,
+            "is_passed": False,
+            "proctoring_score": 100.0,
+            "violation_count": 0,
+            "answers": [],
+            "created_at": now
+        }
+        await db["attempts"].insert_one(attempt)
 
     # Fetch questions
-    links = db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam.id).order_by(ExamQuestion.order_index).all()
-    q_ids = [l.question_id for l in links]
-    questions = db.query(Question).filter(Question.id.in_(q_ids)).all() if q_ids else []
-    q_map = {q.id: q for q in questions}
+    q_ids = exam.get("question_ids", [])
+    cursor = db["questions"].find({"id": {"$in": q_ids}})
+    questions = []
+    async for q in cursor:
+        questions.append(q)
+    
+    q_map = {q["id"]: q for q in questions}
     ordered_questions = [q_map[qid] for qid in q_ids if qid in q_map]
 
-    if exam.randomize_questions:
-        # Deterministically seed with attempt ID so student sees consistent order on reload
-        rng = random.Random(attempt.id)
+    if exam.get("randomize_questions", False):
+        rng = random.Random(attempt["id"])
         rng.shuffle(ordered_questions)
 
-    # Format questions safely for student
     student_questions = []
     for idx, q in enumerate(ordered_questions):
-        raw_options = list(q.options)
-        if exam.randomize_options:
-            rng_opt = random.Random(attempt.id * 1000 + q.id)
+        raw_options = list(q.get("options", []))
+        if exam.get("randomize_options", False):
+            rng_opt = random.Random(attempt["id"] * 1000 + q["id"])
             rng_opt.shuffle(raw_options)
 
         opts = [
             OptionStudentResponse(
-                id=opt.id,
-                option_text=opt.option_text,
+                id=opt.get("id", opt_idx + 1),
+                option_text=opt.get("option_text", ""),
                 order_index=opt_idx
             )
             for opt_idx, opt in enumerate(raw_options)
@@ -103,38 +108,39 @@ def start_exam_attempt(
 
         student_questions.append(
             QuestionStudentResponse(
-                id=q.id,
-                subject=q.subject,
-                text=q.text,
-                question_type=q.question_type or "mcq_single",
-                difficulty=q.difficulty or "medium",
-                marks=q.marks or 1.0,
-                negative_marks=q.negative_marks or 0.0,
+                id=q["id"],
+                subject=q["subject"],
+                text=q["text"],
+                question_type=q.get("question_type", "mcq_single"),
+                difficulty=q.get("difficulty", "medium"),
+                marks=float(q.get("marks", 1.0)),
+                negative_marks=float(q.get("negative_marks", 0.0)),
                 order_index=idx + 1,
                 options=opts
             )
         )
 
     # Existing answers
-    saved_answers = db.query(StudentAnswer).filter(StudentAnswer.attempt_id == attempt.id).all()
+    saved_answers = attempt.get("answers", [])
     current_answers: Dict[int, AnswerState] = {
-        ans.question_id: AnswerState(
-            question_id=ans.question_id,
-            selected_option_id=ans.selected_option_id,
-            is_marked_for_review=ans.is_marked_for_review
+        ans["question_id"]: AnswerState(
+            question_id=ans["question_id"],
+            selected_option_id=ans.get("selected_option_id"),
+            is_marked_for_review=ans.get("is_marked_for_review", False)
         )
         for ans in saved_answers
     }
 
-    remaining_seconds = max(0, int((attempt.end_time - now).total_seconds())) if attempt.end_time else exam.duration_minutes * 60
+    attempt_end = attempt.get("end_time") or (now + timedelta(minutes=duration_minutes))
+    remaining_seconds = max(0, int((attempt_end - now).total_seconds()))
 
     return StartExamResponse(
-        attempt_id=attempt.id,
-        exam_id=exam.id,
-        exam_title=exam.title,
-        duration_minutes=exam.duration_minutes,
-        start_time=attempt.start_time,
-        end_time=attempt.end_time or (now + timedelta(minutes=exam.duration_minutes)),
+        attempt_id=attempt["id"],
+        exam_id=exam["id"],
+        exam_title=exam["title"],
+        duration_minutes=duration_minutes,
+        start_time=attempt.get("start_time", now),
+        end_time=attempt_end,
         remaining_seconds=remaining_seconds,
         total_questions=len(student_questions),
         questions=student_questions,
@@ -142,137 +148,137 @@ def start_exam_attempt(
     )
 
 @router.get("/{id}/time-remaining", response_model=TimeRemainingResponse)
-def get_time_remaining(
+async def get_time_remaining(
     id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Authoritative server countdown check and auto-timeout trigger."""
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == id).first()
+    attempt = await db["attempts"].find_one({"id": id})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
 
-    # Access check
-    if current_user.role == "student" and attempt.student_id != current_user.id:
+    if current_user.role == "student" and attempt["student_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    if attempt.status in ["submitted", "timed_out"]:
+    if attempt.get("status") in ["submitted", "timed_out"]:
         return TimeRemainingResponse(
-            attempt_id=attempt.id,
+            attempt_id=attempt["id"],
             remaining_seconds=0,
             is_expired=True,
-            status=attempt.status
+            status=attempt.get("status")
         )
 
     now = datetime.utcnow()
-    remaining = int((attempt.end_time - now).total_seconds()) if attempt.end_time else 0
+    end_time = attempt.get("end_time")
+    remaining = int((end_time - now).total_seconds()) if end_time else 0
     if remaining <= 0:
-        # Time expired: auto submit
-        evaluate_attempt(attempt.id, db)
-        attempt.status = "timed_out"
-        db.commit()
+        await evaluate_attempt(attempt["id"], db)
+        await db["attempts"].update_one({"id": attempt["id"]}, {"$set": {"status": "timed_out"}})
         return TimeRemainingResponse(
-            attempt_id=attempt.id,
+            attempt_id=attempt["id"],
             remaining_seconds=0,
             is_expired=True,
             status="timed_out"
         )
 
     return TimeRemainingResponse(
-        attempt_id=attempt.id,
+        attempt_id=attempt["id"],
         remaining_seconds=remaining,
         is_expired=False,
-        status=attempt.status
+        status=attempt.get("status", "in_progress")
     )
 
 @router.post("/{id}/answer", status_code=status.HTTP_200_OK)
-def save_answer(
+async def save_answer(
     id: int,
     payload: SaveAnswerRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Save or update candidate's answer for a question in real-time."""
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == id).first()
+    """Save or update candidate's answer for a question in real-time in MongoDB."""
+    attempt = await db["attempts"].find_one({"id": id})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    if attempt.student_id != current_user.id and current_user.role not in ["admin"]:
+    if attempt["student_id"] != current_user.id and current_user.role not in ["admin"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if attempt.status != "in_progress":
+    if attempt.get("status") != "in_progress":
         raise HTTPException(status_code=400, detail="Cannot edit answers for an inactive attempt")
 
-    # Verify deadline
-    if attempt.end_time and datetime.utcnow() > attempt.end_time:
-        evaluate_attempt(attempt.id, db)
-        attempt.status = "timed_out"
-        db.commit()
+    now = datetime.utcnow()
+    end_time = attempt.get("end_time")
+    if end_time and now > end_time:
+        await evaluate_attempt(attempt["id"], db)
+        await db["attempts"].update_one({"id": attempt["id"]}, {"$set": {"status": "timed_out"}})
         raise HTTPException(status_code=400, detail="Exam time expired")
 
-    answer = (
-        db.query(StudentAnswer)
-        .filter(StudentAnswer.attempt_id == id, StudentAnswer.question_id == payload.question_id)
-        .first()
-    )
+    answers = attempt.get("answers", [])
+    found = False
+    for a in answers:
+        if a.get("question_id") == payload.question_id:
+            a["selected_option_id"] = payload.selected_option_id
+            if payload.is_marked_for_review is not None:
+                a["is_marked_for_review"] = payload.is_marked_for_review
+            a["answered_at"] = now
+            found = True
+            break
 
-    if answer:
-        answer.selected_option_id = payload.selected_option_id
-        if payload.is_marked_for_review is not None:
-            answer.is_marked_for_review = payload.is_marked_for_review
-    else:
-        answer = StudentAnswer(
-            attempt_id=id,
-            question_id=payload.question_id,
-            selected_option_id=payload.selected_option_id,
-            is_marked_for_review=payload.is_marked_for_review or False
-        )
-        db.add(answer)
+    if not found:
+        answers.append({
+            "question_id": payload.question_id,
+            "selected_option_id": payload.selected_option_id,
+            "is_marked_for_review": payload.is_marked_for_review or False,
+            "is_correct": False,
+            "marks_awarded": 0.0,
+            "answered_at": now
+        })
 
-    db.commit()
+    await db["attempts"].update_one({"id": id}, {"$set": {"answers": answers}})
     return {"status": "saved", "question_id": payload.question_id, "selected_option_id": payload.selected_option_id}
 
 @router.post("/{id}/submit", response_model=AttemptResultResponse)
-def submit_exam(
+async def submit_exam(
     id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Explicit student submission of exam, calculates marks and returns detailed result."""
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == id).first()
+    attempt = await db["attempts"].find_one({"id": id})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    if attempt.student_id != current_user.id and current_user.role not in ["admin"]:
+    if attempt["student_id"] != current_user.id and current_user.role not in ["admin"]:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    evaluate_attempt(attempt.id, db)
-    attempt.status = "submitted"
-    db.commit()
+    await evaluate_attempt(id, db)
+    await db["attempts"].update_one({"id": id}, {"$set": {"status": "submitted"}})
 
-    return get_attempt_result(id=id, current_user=current_user, db=db)
+    return await get_attempt_result(id=id, current_user=current_user, db=db)
 
 @router.get("/{id}/result", response_model=AttemptResultResponse)
-def get_attempt_result(
+async def get_attempt_result(
     id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Retrieve complete result analysis, question breakdown, and proctoring status."""
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == id).first()
+    attempt = await db["attempts"].find_one({"id": id})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    if current_user.role == "student" and attempt.student_id != current_user.id:
+    if current_user.role == "student" and attempt["student_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
-    student = db.query(User).filter(User.id == attempt.student_id).first()
+    exam = await db["exams"].find_one({"id": attempt["exam_id"]})
+    student = await db["users"].find_one({"id": attempt["student_id"]})
 
-    # Fetch all questions for this exam
-    links = db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam.id).order_by(ExamQuestion.order_index).all()
-    q_ids = [l.question_id for l in links]
-    questions = db.query(Question).filter(Question.id.in_(q_ids)).all() if q_ids else []
-    q_map = {q.id: q for q in questions}
+    q_ids = exam.get("question_ids", []) if exam else []
+    cursor = db["questions"].find({"id": {"$in": q_ids}})
+    questions = []
+    async for q in cursor:
+        questions.append(q)
+    q_map = {q["id"]: q for q in questions}
 
-    student_answers = db.query(StudentAnswer).filter(StudentAnswer.attempt_id == attempt.id).all()
-    ans_map = {a.question_id: a for a in student_answers}
+    student_answers = attempt.get("answers", [])
+    ans_map = {a["question_id"]: a for a in student_answers}
 
     correct_count = 0
     incorrect_count = 0
@@ -286,20 +292,19 @@ def get_attempt_result(
         q = q_map[qid]
         ans = ans_map.get(qid)
         
-        # Options list
         options_data = [
             {
-                "id": opt.id,
-                "option_text": opt.option_text,
-                "is_correct": opt.is_correct
+                "id": opt.get("id"),
+                "option_text": opt.get("option_text", ""),
+                "is_correct": opt.get("is_correct", False)
             }
-            for opt in q.options
+            for opt in q.get("options", [])
         ]
-        correct_opt = next((opt for opt in q.options if opt.is_correct), None)
-        correct_opt_id = correct_opt.id if correct_opt else None
+        correct_opt = next((opt for opt in q.get("options", []) if opt.get("is_correct", False)), None)
+        correct_opt_id = correct_opt.get("id") if correct_opt else None
 
-        selected_opt_id = ans.selected_option_id if ans else None
-        is_marked = ans.is_marked_for_review if ans else False
+        selected_opt_id = ans.get("selected_option_id") if ans else None
+        is_marked = ans.get("is_marked_for_review", False) if ans else False
         if is_marked:
             marked_count += 1
 
@@ -311,23 +316,24 @@ def get_attempt_result(
         else:
             if correct_opt_id and selected_opt_id == correct_opt_id:
                 is_correct = True
-                marks_awarded = q.marks or 1.0
+                marks_awarded = float(q.get("marks", 1.0))
                 correct_count += 1
             else:
                 is_correct = False
                 incorrect_count += 1
-                if exam.negative_marking:
-                    marks_awarded = -abs(q.negative_marks if q.negative_marks > 0 else exam.negative_mark_value)
+                if exam and exam.get("negative_marking", False):
+                    q_neg = float(q.get("negative_marks", 0.0))
+                    marks_awarded = -abs(q_neg if q_neg > 0 else float(exam.get("negative_mark_value", 0.25)))
 
         analysis_items.append(
             QuestionAnalysisItem(
-                question_id=q.id,
-                question_text=q.text,
-                subject=q.subject,
-                difficulty=q.difficulty or "medium",
-                marks=q.marks or 1.0,
-                negative_marks=q.negative_marks or 0.0,
-                explanation=q.explanation,
+                question_id=q["id"],
+                question_text=q["text"],
+                subject=q["subject"],
+                difficulty=q.get("difficulty", "medium"),
+                marks=float(q.get("marks", 1.0)),
+                negative_marks=float(q.get("negative_marks", 0.0)),
+                explanation=q.get("explanation"),
                 options=options_data,
                 selected_option_id=selected_opt_id,
                 correct_option_id=correct_opt_id,
@@ -338,25 +344,28 @@ def get_attempt_result(
         )
 
     # Proctoring status
-    events = db.query(ProctoringEvent).filter(ProctoringEvent.attempt_id == attempt.id).all()
+    proc_cursor = db["proctoring_incidents"].find({"attempt_id": attempt["id"]})
+    events = []
+    async for ev in proc_cursor:
+        events.append(ev)
     proc_info = calculate_proctoring_score(events)
 
     return AttemptResultResponse(
-        attempt_id=attempt.id,
-        exam_id=exam.id,
-        exam_title=exam.title,
-        student_id=student.id,
-        student_name=student.name,
-        student_email=student.email,
-        status=attempt.status,
-        start_time=attempt.start_time,
-        submitted_at=attempt.submitted_at,
-        time_spent_seconds=attempt.time_spent_seconds or 0,
-        score=attempt.score,
-        total_possible_marks=attempt.total_possible_marks,
-        percentage=attempt.percentage,
-        is_passed=attempt.is_passed,
-        passing_marks=exam.passing_marks,
+        attempt_id=attempt["id"],
+        exam_id=exam["id"] if exam else 0,
+        exam_title=exam.get("title", "Exam") if exam else "Exam",
+        student_id=student["id"] if student else attempt["student_id"],
+        student_name=student.get("name", "Student") if student else "Student",
+        student_email=student.get("email", "") if student else "",
+        status=attempt.get("status", "submitted"),
+        start_time=attempt.get("start_time", datetime.utcnow()),
+        submitted_at=attempt.get("submitted_at"),
+        time_spent_seconds=attempt.get("time_spent_seconds", 0),
+        score=float(attempt.get("score", 0.0)),
+        total_possible_marks=float(attempt.get("total_possible_marks", 100.0)),
+        percentage=float(attempt.get("percentage", 0.0)),
+        is_passed=attempt.get("is_passed", False),
+        passing_marks=float(exam.get("passing_marks", 40.0)) if exam else 40.0,
         total_questions=len(analysis_items),
         correct_count=correct_count,
         incorrect_count=incorrect_count,
@@ -369,44 +378,44 @@ def get_attempt_result(
     )
 
 @router.get("", response_model=List[AttemptSummaryAdmin])
-def list_attempts(
+async def list_attempts(
     exam_id: Optional[int] = None,
     student_id: Optional[int] = None,
-    current_user: User = Depends(require_role(["admin", "examiner"])),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Admin / Examiner list examination attempts across all students."""
-    query = db.query(ExamAttempt)
+    """Admin / Examiner list examination attempts across all students from MongoDB."""
+    query = {}
     if exam_id:
-        query = query.filter(ExamAttempt.exam_id == exam_id)
+        query["exam_id"] = exam_id
     if student_id:
-        query = query.filter(ExamAttempt.student_id == student_id)
+        query["student_id"] = student_id
 
-    attempts = query.order_by(ExamAttempt.id.desc()).all()
+    cursor = db["attempts"].find(query).sort("id", -1)
     summaries = []
-    for att in attempts:
-        exam = db.query(Exam).filter(Exam.id == att.exam_id).first()
-        student = db.query(User).filter(User.id == att.student_id).first()
+    async for att in cursor:
+        exam = await db["exams"].find_one({"id": att["exam_id"]})
+        student = await db["users"].find_one({"id": att["student_id"]})
         if exam and student:
             summaries.append(
                 AttemptSummaryAdmin(
-                    id=att.id,
-                    exam_id=exam.id,
-                    exam_title=exam.title,
-                    student_id=student.id,
-                    student_name=student.name,
-                    student_email=student.email,
-                    student_code=student.student_id,
-                    status=att.status,
-                    start_time=att.start_time,
-                    submitted_at=att.submitted_at,
-                    time_spent_seconds=att.time_spent_seconds or 0,
-                    score=att.score,
-                    total_possible_marks=att.total_possible_marks,
-                    percentage=att.percentage,
-                    is_passed=att.is_passed,
-                    proctoring_score=att.proctoring_score,
-                    violation_count=att.violation_count
+                    id=att["id"],
+                    exam_id=exam["id"],
+                    exam_title=exam.get("title", "Exam"),
+                    student_id=student["id"],
+                    student_name=student.get("name", "Student"),
+                    student_email=student.get("email", ""),
+                    student_code=student.get("student_id"),
+                    status=att.get("status", "submitted"),
+                    start_time=att.get("start_time", datetime.utcnow()),
+                    submitted_at=att.get("submitted_at"),
+                    time_spent_seconds=att.get("time_spent_seconds", 0),
+                    score=float(att.get("score", 0.0)),
+                    total_possible_marks=float(att.get("total_possible_marks", 100.0)),
+                    percentage=float(att.get("percentage", 0.0)),
+                    is_passed=att.get("is_passed", False),
+                    proctoring_score=float(att.get("proctoring_score", 100.0)),
+                    violation_count=int(att.get("violation_count", 0))
                 )
             )
     return summaries

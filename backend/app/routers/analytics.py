@@ -1,67 +1,66 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+﻿from fastapi import APIRouter, Depends
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import Dict, Any, List
 
-from app.database import get_db
-from app.models.user import User
-from app.models.exam import Exam
-from app.models.attempt import ExamAttempt
-from app.models.proctoring import ProctoringEvent
+from app.mongodb import get_database
+from app.schemas.auth import UserResponse
 from app.utils.security import require_role
 
 router = APIRouter(prefix="/analytics", tags=["Analytics & Reporting"])
 
 @router.get("/dashboard")
-def get_dashboard_metrics(
-    current_user: User = Depends(require_role(["admin", "examiner"])),
-    db: Session = Depends(get_db)
+async def get_dashboard_metrics(
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ) -> Dict[str, Any]:
-    """Retrieve high-level KPIs and distribution metrics for executive admin dashboard."""
-    total_students = db.query(User).filter(User.role == "student").count()
-    total_exams = db.query(Exam).count()
-    active_exams = db.query(Exam).filter(Exam.status == "active").count()
+    """Retrieve high-level KPIs and distribution metrics for executive admin dashboard from MongoDB."""
+    total_students = await db["users"].count_documents({"role": "student"})
+    total_exams = await db["exams"].count_documents({})
+    active_exams = await db["exams"].count_documents({"status": "active"})
     
-    attempts = db.query(ExamAttempt).all()
+    attempts_cursor = db["attempts"].find({})
+    attempts = []
+    async for a in attempts_cursor:
+        attempts.append(a)
+
     total_attempts = len(attempts)
-    completed_attempts = [a for a in attempts if a.status in ["submitted", "timed_out"]]
+    completed_attempts = [a for a in attempts if a.get("status") in ["submitted", "timed_out"]]
     
     avg_score = 0.0
     if completed_attempts:
-        avg_score = round(sum(a.percentage for a in completed_attempts) / len(completed_attempts), 1)
+        avg_score = round(sum(float(a.get("percentage", 0.0)) for a in completed_attempts) / len(completed_attempts), 1)
 
-    suspicious_attempts = [a for a in attempts if a.proctoring_score < 70.0 or a.violation_count >= 3]
-    total_violations = db.query(ProctoringEvent).count()
+    suspicious_attempts = [a for a in attempts if float(a.get("proctoring_score", 100.0)) < 70.0 or int(a.get("violation_count", 0)) >= 3]
+    total_violations = await db["proctoring_incidents"].count_documents({})
 
-    # Violation types breakdown
-    violation_counts = (
-        db.query(ProctoringEvent.event_type, func.count(ProctoringEvent.id))
-        .group_by(ProctoringEvent.event_type)
-        .all()
-    )
-    violation_types_data = {v[0]: v[1] for v in violation_counts}
+    # Violation types breakdown using MongoDB aggregation
+    pipeline = [
+        {"$group": {"_id": "$event_type", "count": {"$sum": 1}}}
+    ]
+    violation_counts = await db["proctoring_incidents"].aggregate(pipeline).to_list(length=100)
+    violation_types_data = {v["_id"]: v["count"] for v in violation_counts if v.get("_id")}
 
     # Recent attempts
-    recent_attempts_query = db.query(ExamAttempt).order_by(ExamAttempt.id.desc()).limit(8).all()
+    recent_attempts_cursor = db["attempts"].find({}).sort("id", -1).limit(8)
     recent_attempts = []
-    for att in recent_attempts_query:
-        exam = db.query(Exam).filter(Exam.id == att.exam_id).first()
-        student = db.query(User).filter(User.id == att.student_id).first()
+    async for att in recent_attempts_cursor:
+        exam = await db["exams"].find_one({"id": att["exam_id"]})
+        student = await db["users"].find_one({"id": att["student_id"]})
         if exam and student:
             recent_attempts.append({
-                "id": att.id,
-                "student_name": student.name,
-                "student_email": student.email,
-                "student_code": student.student_id,
-                "exam_title": exam.title,
-                "status": att.status,
-                "score": att.score,
-                "total_possible_marks": att.total_possible_marks,
-                "percentage": att.percentage,
-                "proctoring_score": att.proctoring_score,
-                "violation_count": att.violation_count,
-                "start_time": att.start_time,
-                "submitted_at": att.submitted_at
+                "id": att["id"],
+                "student_name": student.get("name", "Student"),
+                "student_email": student.get("email", ""),
+                "student_code": student.get("student_id"),
+                "exam_title": exam.get("title", "Exam"),
+                "status": att.get("status", "submitted"),
+                "score": float(att.get("score", 0.0)),
+                "total_possible_marks": float(att.get("total_possible_marks", 100.0)),
+                "percentage": float(att.get("percentage", 0.0)),
+                "proctoring_score": float(att.get("proctoring_score", 100.0)),
+                "violation_count": int(att.get("violation_count", 0)),
+                "start_time": att.get("start_time"),
+                "submitted_at": att.get("submitted_at")
             })
 
     return {

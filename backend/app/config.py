@@ -14,8 +14,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 12  # 12 hours
     
-    # Database (SQLite by default, can be overridden via DATABASE_URL env variable)
+    # Database Configuration
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/examshield.db"
+    MONGO_URI: str = "mongodb://localhost:27017"
+    MONGO_DB_NAME: str = "examshield_db"
     
     # Uploads & Evidence
     UPLOAD_DIR: Path = BASE_DIR / "uploads"

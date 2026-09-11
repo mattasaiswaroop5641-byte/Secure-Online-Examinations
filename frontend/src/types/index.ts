@@ -8,13 +8,23 @@ export interface User {
   role: Role;
   avatar_url?: string | null;
   is_active: boolean;
+  is_2fa_enabled?: boolean;
   created_at?: string;
 }
 
 export interface AuthResponse {
-  access_token: string;
-  token_type: string;
-  user: User;
+  access_token?: string;
+  token_type?: string;
+  user?: User;
+  requires_2fa?: boolean;
+  email?: string;
+  message?: string;
+}
+
+export interface TwoFactorSetupResponse {
+  secret: string;
+  qr_code: string;
+  otpauth_url: string;
 }
 
 export interface OptionAdmin {

@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Role } from '../types';
+﻿import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, Role, AuthResponse } from '../types';
 import { authService } from '../services/auth';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string, otp_code?: string) => Promise<AuthResponse>;
   register: (data: { name: string; email: string; password: string; student_id?: string; role?: string }) => Promise<User>;
+  refreshUser: () => Promise<User | null>;
   logout: () => void;
 }
 
@@ -18,33 +19,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('examshield_token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const refreshUser = async (): Promise<User | null> => {
+    if (token) {
+      try {
+        const profile = await authService.getMe();
+        setUser(profile);
+        return profile;
+      } catch (err) {
+        console.error('Failed to restore authentication session:', err);
+        logout();
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
     async function loadUser() {
-      if (token) {
-        try {
-          const profile = await authService.getMe();
-          setUser(profile);
-        } catch (err) {
-          console.error('Failed to restore authentication session:', err);
-          logout();
-        }
-      }
+      await refreshUser();
       setIsLoading(false);
     }
     loadUser();
   }, [token]);
 
-  const login = async (email: string, password: string): Promise<User> => {
-    const res = await authService.login(email, password);
-    localStorage.setItem('examshield_token', res.access_token);
-    setToken(res.access_token);
-    setUser(res.user);
-    return res.user;
+  const login = async (email: string, password: string, otp_code?: string): Promise<AuthResponse> => {
+    const res = await authService.login(email, password, otp_code);
+    if (res.access_token && res.user) {
+      localStorage.setItem('examshield_token', res.access_token);
+      setToken(res.access_token);
+      setUser(res.user);
+    }
+    return res;
   };
 
   const register = async (data: { name: string; email: string; password: string; student_id?: string; role?: string }): Promise<User> => {
     const newUser = await authService.register(data);
-    // Automatically log in after registration
     await login(data.email, data.password);
     return newUser;
   };
@@ -56,7 +64,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, register, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

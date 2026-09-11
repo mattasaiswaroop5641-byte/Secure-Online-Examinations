@@ -1,11 +1,6 @@
-from datetime import datetime
+﻿from datetime import datetime
 from typing import Dict, Any, List
-from sqlalchemy.orm import Session
-
-from app.models.attempt import ExamAttempt, StudentAnswer
-from app.models.exam import Exam
-from app.models.question import Question, QuestionOption, ExamQuestion
-from app.models.proctoring import ProctoringEvent
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 SEVERITY_DEDUCTIONS = {
     "CRITICAL": 15.0,
@@ -14,13 +9,13 @@ SEVERITY_DEDUCTIONS = {
     "LOW": 1.5
 }
 
-def calculate_proctoring_score(events: List[ProctoringEvent]) -> Dict[str, Any]:
+def calculate_proctoring_score(events: List[dict]) -> Dict[str, Any]:
     """Calculates integrity trust score (0-100) and status from proctoring events."""
     base_score = 100.0
     deductions = 0.0
     
     for ev in events:
-        deductions += SEVERITY_DEDUCTIONS.get(ev.severity, 3.0)
+        deductions += SEVERITY_DEDUCTIONS.get(ev.get("severity", "MEDIUM"), 3.0)
         
     final_score = max(0.0, min(100.0, round(base_score - deductions, 1)))
     
@@ -37,106 +32,105 @@ def calculate_proctoring_score(events: List[ProctoringEvent]) -> Dict[str, Any]:
         "violations_count": len(events)
     }
 
-def evaluate_attempt(attempt_id: int, db: Session) -> ExamAttempt:
+async def evaluate_attempt(attempt_id: int, db: AsyncIOMotorDatabase) -> dict:
     """
-    Evaluates an exam attempt server-side:
+    Evaluates an exam attempt server-side in MongoDB:
     - Calculates marks for each answer taking into account negative marking
     - Updates marks_awarded and is_correct flags
     - Calculates overall score, percentage, and pass/fail
     - Recalculates proctoring trust score
     """
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
+    attempt = await db["attempts"].find_one({"id": attempt_id})
     if not attempt:
         raise ValueError("Attempt not found")
         
-    exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
+    exam = await db["exams"].find_one({"id": attempt["exam_id"]})
     if not exam:
         raise ValueError("Exam not found")
 
-    # Fetch all questions linked to this exam
-    exam_questions = (
-        db.query(ExamQuestion)
-        .filter(ExamQuestion.exam_id == exam.id)
-        .order_by(ExamQuestion.order_index)
-        .all()
-    )
-    question_ids = [eq.question_id for eq in exam_questions]
-    questions = db.query(Question).filter(Question.id.in_(question_ids)).all() if question_ids else []
-    question_map = {q.id: q for q in questions}
+    question_ids = exam.get("question_ids", [])
+    cursor = db["questions"].find({"id": {"$in": question_ids}})
+    questions = []
+    async for q in cursor:
+        questions.append(q)
+    
+    q_map = {q["id"]: q for q in questions}
 
-    # Fetch existing student answers
-    student_answers = (
-        db.query(StudentAnswer)
-        .filter(StudentAnswer.attempt_id == attempt.id)
-        .all()
-    )
-    answer_map = {a.question_id: a for a in student_answers}
+    # Fetch student answers stored in attempt document
+    answers_list = attempt.get("answers", [])
+    answer_map = {a["question_id"]: a for a in answers_list}
 
     total_score = 0.0
     total_possible = 0.0
+    updated_answers = []
 
-    for q in questions:
-        q_marks = q.marks or 1.0
+    for qid in question_ids:
+        q = q_map.get(qid)
+        if not q:
+            continue
+
+        q_marks = float(q.get("marks", 1.0))
         total_possible += q_marks
 
-        # Correct option for question
-        correct_option = (
-            db.query(QuestionOption)
-            .filter(QuestionOption.question_id == q.id, QuestionOption.is_correct == True)
-            .first()
-        )
-        correct_option_id = correct_option.id if correct_option else None
+        # Find correct option id
+        correct_option_id = None
+        for opt in q.get("options", []):
+            if opt.get("is_correct", False):
+                correct_option_id = opt.get("id")
+                break
 
-        ans = answer_map.get(q.id)
-        if ans and ans.selected_option_id is not None:
-            if correct_option_id and ans.selected_option_id == correct_option_id:
-                ans.is_correct = True
-                ans.marks_awarded = q_marks
+        ans = answer_map.get(qid)
+        if ans and ans.get("selected_option_id") is not None:
+            sel_opt = ans.get("selected_option_id")
+            if correct_option_id and sel_opt == correct_option_id:
+                ans["is_correct"] = True
+                ans["marks_awarded"] = q_marks
                 total_score += q_marks
             else:
-                ans.is_correct = False
-                # Apply negative marking if configured
+                ans["is_correct"] = False
                 penalty = 0.0
-                if exam.negative_marking:
-                    penalty = q.negative_marks if q.negative_marks > 0 else exam.negative_mark_value
-                ans.marks_awarded = -abs(penalty)
+                if exam.get("negative_marking", False):
+                    q_neg = float(q.get("negative_marks", 0.0))
+                    penalty = q_neg if q_neg > 0 else float(exam.get("negative_mark_value", 0.25))
+                ans["marks_awarded"] = -abs(penalty)
                 total_score -= abs(penalty)
+            updated_answers.append(ans)
         elif ans:
-            ans.is_correct = False
-            ans.marks_awarded = 0.0
+            ans["is_correct"] = False
+            ans["marks_awarded"] = 0.0
+            updated_answers.append(ans)
 
-    # Ensure score doesn't go below 0
     total_score = max(0.0, round(total_score, 2))
     total_possible = max(1.0, round(total_possible, 2))
     percentage = round((total_score / total_possible) * 100.0, 2)
-    is_passed = total_score >= exam.passing_marks
+    is_passed = total_score >= float(exam.get("passing_marks", 40.0))
 
-    # Update attempt record
-    attempt.score = total_score
-    attempt.total_possible_marks = total_possible
-    attempt.percentage = percentage
-    attempt.is_passed = is_passed
-
-    # Evaluate proctoring score
-    events = (
-        db.query(ProctoringEvent)
-        .filter(ProctoringEvent.attempt_id == attempt.id)
-        .all()
-    )
+    # Fetch proctoring incidents
+    proc_cursor = db["proctoring_incidents"].find({"attempt_id": attempt_id})
+    events = []
+    async for ev in proc_cursor:
+        events.append(ev)
+    
     proc_summary = calculate_proctoring_score(events)
-    attempt.proctoring_score = proc_summary["score"]
-    attempt.violation_count = proc_summary["violations_count"]
 
-    if attempt.status == "in_progress":
-        attempt.status = "submitted"
-    if not attempt.submitted_at:
-        attempt.submitted_at = datetime.utcnow()
+    now = datetime.utcnow()
+    submitted_at = attempt.get("submitted_at") or now
+    start_time = attempt.get("start_time") or now
+    time_spent = int(max(0, (submitted_at - start_time).total_seconds()))
 
-    # Time spent
-    if attempt.start_time:
-        delta = (attempt.submitted_at - attempt.start_time).total_seconds()
-        attempt.time_spent_seconds = int(max(0, delta))
+    update_fields = {
+        "answers": updated_answers,
+        "score": total_score,
+        "total_possible_marks": total_possible,
+        "percentage": percentage,
+        "is_passed": is_passed,
+        "proctoring_score": proc_summary["score"],
+        "violation_count": proc_summary["violations_count"],
+        "status": "submitted" if attempt.get("status") == "in_progress" else attempt.get("status", "submitted"),
+        "submitted_at": submitted_at,
+        "time_spent_seconds": time_spent
+    }
 
-    db.commit()
-    db.refresh(attempt)
-    return attempt
+    await db["attempts"].update_one({"id": attempt_id}, {"$set": update_fields})
+    updated_attempt = await db["attempts"].find_one({"id": attempt_id})
+    return updated_attempt

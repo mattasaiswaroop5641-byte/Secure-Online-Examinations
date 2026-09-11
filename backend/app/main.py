@@ -1,10 +1,11 @@
+﻿from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.config import settings
-from app.database import engine, Base
+from app.mongodb import connect_to_mongo, close_mongo_connection
 from app.routers import (
     auth_router,
     exams_router,
@@ -14,19 +15,25 @@ from app.routers import (
     analytics_router
 )
 
-# Initialize database tables
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Connect to MongoDB Atlas / Local cluster
+    await connect_to_mongo()
+    yield
+    # Shutdown: Close database connection pool
+    await close_mongo_connection()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.PROJECT_VERSION,
-    description="ExamShield - Secure Online Examination System with Continuous Face Proctoring API"
+    description="ExamShield - Secure Online Examination System with Continuous Face Proctoring API (MongoDB Atlas)",
+    lifespan=lifespan
 )
 
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For seamless local development and demo
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,12 +57,13 @@ def health_check():
     return {
         "status": "healthy",
         "system": "ExamShield Proctoring API",
+        "database": "MongoDB Atlas",
         "version": settings.PROJECT_VERSION
     }
 
 @app.get("/")
 def root():
     return {
-        "message": "Welcome to ExamShield API. Visit /docs for OpenAPI Swagger documentation.",
+        "message": "Welcome to ExamShield API powered by MongoDB Atlas. Visit /docs for OpenAPI Swagger documentation.",
         "version": settings.PROJECT_VERSION
     }

@@ -1,13 +1,10 @@
-from datetime import datetime
+﻿from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List, Dict
 
-from app.database import get_db
-from app.models.user import User
-from app.models.attempt import ExamAttempt
-from app.models.exam import Exam
-from app.models.proctoring import ProctoringEvent
+from app.mongodb import get_database, get_next_sequence
+from app.schemas.auth import UserResponse
 from app.schemas.proctoring import (
     ProctoringEventCreate, ProctoringEventResponse, ProctoringSummaryResponse,
     FrameVerificationRequest, FrameVerificationResponse
@@ -19,119 +16,133 @@ from app.utils.security import get_current_user, require_role
 router = APIRouter(prefix="/proctoring", tags=["Continuous Proctoring"])
 
 @router.post("/events", response_model=ProctoringEventResponse, status_code=status.HTTP_201_CREATED)
-def log_proctoring_event(
+async def log_proctoring_event(
     payload: ProctoringEventCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """
     Ingests continuous proctoring violation events in real time.
     Optionally saves screenshot evidence frames annotated with computer vision bounding boxes.
     """
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == payload.attempt_id).first()
+    attempt = await db["attempts"].find_one({"id": payload.attempt_id})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
 
-    if attempt.student_id != current_user.id and current_user.role not in ["admin"]:
+    if attempt["student_id"] != current_user.id and current_user.role not in ["admin"]:
         raise HTTPException(status_code=403, detail="Forbidden")
 
     screenshot_path = None
     if payload.screenshot_base64:
         screenshot_path = save_evidence_snapshot(
             image_base64=payload.screenshot_base64,
-            attempt_id=attempt.id,
+            attempt_id=attempt["id"],
             event_type=payload.event_type,
             severity=payload.severity
         )
 
-    event = ProctoringEvent(
-        attempt_id=attempt.id,
-        student_id=attempt.student_id,
-        event_type=payload.event_type,
-        severity=payload.severity.upper(),
-        timestamp=payload.timestamp or datetime.utcnow(),
-        duration_seconds=payload.duration_seconds or 0.0,
-        description=payload.description or f"Suspicious event detected: {payload.event_type}",
-        screenshot_path=screenshot_path,
-        resolved=False
-    )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
+    new_event_id = await get_next_sequence("proctoring_event_id", db)
+    now = datetime.utcnow()
+    event_time = payload.timestamp or now
+
+    event_doc = {
+        "id": new_event_id,
+        "attempt_id": attempt["id"],
+        "student_id": attempt["student_id"],
+        "event_type": payload.event_type,
+        "severity": payload.severity.upper(),
+        "timestamp": event_time,
+        "duration_seconds": payload.duration_seconds or 0.0,
+        "description": payload.description or f"Suspicious event detected: {payload.event_type}",
+        "screenshot_path": screenshot_path,
+        "resolved": False,
+        "created_at": now
+    }
+    await db["proctoring_incidents"].insert_one(event_doc)
 
     # Recalculate attempt integrity score
-    all_events = db.query(ProctoringEvent).filter(ProctoringEvent.attempt_id == attempt.id).all()
+    cursor = db["proctoring_incidents"].find({"attempt_id": attempt["id"]})
+    all_events = []
+    async for ev in cursor:
+        all_events.append(ev)
+        
     proc_info = calculate_proctoring_score(all_events)
-    attempt.proctoring_score = proc_info["score"]
-    attempt.violation_count = proc_info["violations_count"]
-    db.commit()
+    await db["attempts"].update_one(
+        {"id": attempt["id"]},
+        {"$set": {
+            "proctoring_score": proc_info["score"],
+            "violation_count": proc_info["violations_count"]
+        }}
+    )
 
-    student = db.query(User).filter(User.id == attempt.student_id).first()
+    student = await db["users"].find_one({"id": attempt["student_id"]})
 
     return ProctoringEventResponse(
-        id=event.id,
-        attempt_id=event.attempt_id,
-        student_id=event.student_id,
-        student_name=student.name if student else None,
-        event_type=event.event_type,
-        severity=event.severity,
-        timestamp=event.timestamp,
-        duration_seconds=event.duration_seconds,
-        description=event.description,
-        screenshot_path=event.screenshot_path,
-        resolved=event.resolved,
-        created_at=event.created_at
+        id=event_doc["id"],
+        attempt_id=event_doc["attempt_id"],
+        student_id=event_doc["student_id"],
+        student_name=student.get("name") if student else None,
+        event_type=event_doc["event_type"],
+        severity=event_doc["severity"],
+        timestamp=event_doc["timestamp"],
+        duration_seconds=event_doc["duration_seconds"],
+        description=event_doc["description"],
+        screenshot_path=event_doc["screenshot_path"],
+        resolved=event_doc["resolved"],
+        created_at=event_doc["created_at"]
     )
 
 @router.get("/{attempt_id}", response_model=ProctoringSummaryResponse)
-def get_proctoring_summary(
+async def get_proctoring_summary(
     attempt_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Retrieve proctoring audit log, event timeline, and forensic stats for an attempt."""
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
+    attempt = await db["attempts"].find_one({"id": attempt_id})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
 
-    if current_user.role == "student" and attempt.student_id != current_user.id:
+    if current_user.role == "student" and attempt["student_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
-    student = db.query(User).filter(User.id == attempt.student_id).first()
-    events = db.query(ProctoringEvent).filter(ProctoringEvent.attempt_id == attempt_id).order_by(ProctoringEvent.timestamp.asc()).all()
+    exam = await db["exams"].find_one({"id": attempt["exam_id"]})
+    student = await db["users"].find_one({"id": attempt["student_id"]})
 
+    cursor = db["proctoring_incidents"].find({"attempt_id": attempt_id}).sort("timestamp", 1)
+    events = []
     by_type: Dict[str, int] = {}
     by_sev: Dict[str, int] = {}
     event_responses = []
 
-    for ev in events:
-        by_type[ev.event_type] = by_type.get(ev.event_type, 0) + 1
-        by_sev[ev.severity] = by_sev.get(ev.severity, 0) + 1
+    async for ev in cursor:
+        events.append(ev)
+        by_type[ev["event_type"]] = by_type.get(ev["event_type"], 0) + 1
+        by_sev[ev["severity"]] = by_sev.get(ev["severity"], 0) + 1
         event_responses.append(
             ProctoringEventResponse(
-                id=ev.id,
-                attempt_id=ev.attempt_id,
-                student_id=ev.student_id,
-                student_name=student.name if student else None,
-                event_type=ev.event_type,
-                severity=ev.severity,
-                timestamp=ev.timestamp,
-                duration_seconds=ev.duration_seconds,
-                description=ev.description,
-                screenshot_path=ev.screenshot_path,
-                resolved=ev.resolved,
-                created_at=ev.created_at
+                id=ev["id"],
+                attempt_id=ev["attempt_id"],
+                student_id=ev["student_id"],
+                student_name=student.get("name") if student else None,
+                event_type=ev["event_type"],
+                severity=ev["severity"],
+                timestamp=ev["timestamp"],
+                duration_seconds=float(ev.get("duration_seconds", 0.0)),
+                description=ev.get("description"),
+                screenshot_path=ev.get("screenshot_path"),
+                resolved=ev.get("resolved", False),
+                created_at=ev.get("created_at", datetime.utcnow())
             )
         )
 
     score_info = calculate_proctoring_score(events)
 
     return ProctoringSummaryResponse(
-        attempt_id=attempt.id,
-        student_id=student.id if student else 0,
-        student_name=student.name if student else "Unknown",
-        exam_title=exam.title if exam else "Unknown",
+        attempt_id=attempt["id"],
+        student_id=student["id"] if student else 0,
+        student_name=student.get("name", "Unknown") if student else "Unknown",
+        exam_title=exam.get("title", "Unknown") if exam else "Unknown",
         proctoring_score=score_info["score"],
         proctoring_status=score_info["status"],
         total_violations=len(events),
@@ -143,7 +154,7 @@ def get_proctoring_summary(
 @router.post("/verify-frame", response_model=FrameVerificationResponse)
 def verify_frame(
     payload: FrameVerificationRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user)
 ):
     """
     Direct server-side OpenCV computer vision verification endpoint.
@@ -159,15 +170,13 @@ def verify_frame(
     )
 
 @router.put("/events/{event_id}/resolve")
-def resolve_proctoring_event(
+async def resolve_proctoring_event(
     event_id: int,
-    current_user: User = Depends(require_role(["admin", "examiner"])),
-    db: Session = Depends(get_db)
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Admin / Examiner mark an incident as reviewed/resolved."""
-    event = db.query(ProctoringEvent).filter(ProctoringEvent.id == event_id).first()
-    if not event:
+    res = await db["proctoring_incidents"].update_one({"id": event_id}, {"$set": {"resolved": True}})
+    if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")
-    event.resolved = True
-    db.commit()
     return {"status": "resolved", "event_id": event_id}

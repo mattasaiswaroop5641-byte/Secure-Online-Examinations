@@ -1,14 +1,14 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import settings
-from app.database import get_db
-from app.models.user import User
+from app.mongodb import get_database
+from app.schemas.auth import UserResponse
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
@@ -29,7 +29,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+) -> UserResponse:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -37,21 +40,32 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
             raise credentials_exception
-    except JWTError:
+        user_id = int(user_id_str)
+    except (JWTError, ValueError):
         raise credentials_exception
     
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if user is None:
+    user_doc = await db["users"].find_one({"id": user_id})
+    if user_doc is None:
         raise credentials_exception
-    if not user.is_active:
+    if not user_doc.get("is_active", True):
         raise HTTPException(status_code=400, detail="Inactive user account")
-    return user
+    
+    return UserResponse(
+        id=user_doc["id"],
+        name=user_doc["name"],
+        email=user_doc["email"],
+        student_id=user_doc.get("student_id"),
+        role=user_doc.get("role", "student"),
+        avatar_url=user_doc.get("avatar_url"),
+        is_active=user_doc.get("is_active", True),
+        created_at=user_doc.get("created_at", datetime.utcnow())
+    )
 
 def require_role(allowed_roles: List[str]):
-    def role_checker(current_user: User = Depends(get_current_user)) -> User:
+    def role_checker(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

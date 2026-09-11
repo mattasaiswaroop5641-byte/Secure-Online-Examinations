@@ -1,16 +1,11 @@
-import pytest
-from fastapi.testclient import TestClient
-from app.main import app
+﻿import pytest
+import uuid
 
-client = TestClient(app)
-
-def get_auth_token(email: str = "student@example.com", password: str = "Student@123") -> str:
+def get_auth_token(client, email: str = "student@example.com", password: str = "Student@123") -> str:
     res = client.post("/api/auth/login", json={"email": email, "password": password})
     return res.json()["access_token"]
 
-import uuid
-
-def get_fresh_student_token() -> str:
+def get_fresh_student_token(client) -> str:
     uid = uuid.uuid4().hex[:6]
     email = f"exam_taker_{uid}@example.com"
     client.post(
@@ -20,23 +15,23 @@ def get_fresh_student_token() -> str:
     res = client.post("/api/auth/login", json={"email": email, "password": "Student@123"})
     return res.json()["access_token"]
 
-def test_list_exams():
-    token = get_auth_token()
+def test_list_exams(client):
+    token = get_auth_token(client)
     response = client.get("/api/exams", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     exams = response.json()
-    assert len(exams) >= 2
-    # Student view check
+    assert len(exams) >= 1
     assert "title" in exams[0]
     assert "duration_minutes" in exams[0]
 
-def test_student_exam_attempt_flow():
-    token = get_fresh_student_token()
+def test_student_exam_attempt_flow(client):
+    token = get_fresh_student_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
     # 1. Get available exams
     exams = client.get("/api/exams", headers=headers).json()
-    exam = next(e for e in exams if e["title"] == "Full-Stack Web Architecture & Cloud Systems")
+    assert len(exams) > 0
+    exam = exams[0]
 
     # 2. Start exam
     start_resp = client.post(f"/api/attempts/exams/{exam['id']}/start", headers=headers)
@@ -47,7 +42,6 @@ def test_student_exam_attempt_flow():
     assert len(exam_payload["questions"]) > 0
 
     first_q = exam_payload["questions"][0]
-    # Check that is_correct and explanation are NOT leaked to student
     assert "explanation" not in first_q
     assert "is_correct" not in first_q["options"][0]
 

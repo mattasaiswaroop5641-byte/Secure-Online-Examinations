@@ -1,15 +1,10 @@
-import pytest
+﻿import pytest
 import base64
 import numpy as np
 import cv2
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-
 import uuid
 
-def get_fresh_student_token() -> str:
+def get_fresh_student_token(client) -> str:
     uid = uuid.uuid4().hex[:6]
     email = f"proctor_test_{uid}@example.com"
     client.post(
@@ -25,12 +20,13 @@ def make_dummy_base64_image() -> str:
     _, buffer = cv2.imencode(".jpg", img)
     return "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
-def test_proctoring_event_logging():
-    token = get_fresh_student_token()
+def test_proctoring_event_logging(client):
+    token = get_fresh_student_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
     # First start an exam attempt to attach events to
     exams = client.get("/api/exams", headers=headers).json()
+    assert len(exams) > 0
     exam = exams[0]
     start_resp = client.post(f"/api/attempts/exams/{exam['id']}/start", headers=headers)
     assert start_resp.status_code == 200
@@ -60,8 +56,8 @@ def test_proctoring_event_logging():
     assert summary["total_violations"] >= 1
     assert "TAB_SWITCH" in summary["violations_by_type"]
 
-def test_opencv_frame_verification():
-    token = get_fresh_student_token()
+def test_opencv_frame_verification(client):
+    token = get_fresh_student_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
     dummy_img = make_dummy_base64_image()
