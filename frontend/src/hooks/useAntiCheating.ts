@@ -12,6 +12,9 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
   const [windowBlurWarning, setWindowBlurWarning] = useState<string | null>(null);
   const lastBlurTimeRef = useRef<number>(0);
 
+  const onViolationRef = useRef(onViolation);
+  onViolationRef.current = onViolation;
+
   const requestFullscreen = useCallback(async () => {
     try {
       const docEl = document.documentElement as any;
@@ -49,7 +52,7 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
       setIsFullscreen(isNowFs);
       if (!isNowFs && isActive) {
         setFullscreenWarning(true);
-        onViolation(
+        onViolationRef.current(
           'FULLSCREEN_EXIT',
           'HIGH',
           'Candidate exited required fullscreen examination mode.'
@@ -60,18 +63,18 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
     // 2. Alt+Tab / App Switch & Window Blur Detection
     const triggerSwitchViolation = (trigger: string) => {
       const now = Date.now();
-      // Debounce trigger within 3 seconds so blur + visibilitychange don't duplicate
-      if (now - lastBlurTimeRef.current < 3000) {
+      // Debounce trigger within 2 seconds
+      if (now - lastBlurTimeRef.current < 2000) {
         return;
       }
       lastBlurTimeRef.current = now;
-      setWindowBlurWarning('Security Notice: Window Focus Lost / Alt+Tab Application Switch Detected!');
+      setWindowBlurWarning(`Security Alert: Application Switch Detected (${trigger})`);
       setTimeout(() => setWindowBlurWarning(null), 5000);
 
-      onViolation(
+      onViolationRef.current(
         'TAB_SWITCH',
         'HIGH',
-        `Application Switch Detected (${trigger}). Candidate navigated away from the active examination window.`
+        `Application Switch Detected (${trigger}). Candidate navigated away from active examination window.`
       );
     };
 
@@ -97,7 +100,7 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
     // 4. Copy / Cut / Paste suppression
     const handleCopyCutPaste = (e: ClipboardEvent) => {
       e.preventDefault();
-      onViolation('DEVTOOLS_SUSPECT', 'MEDIUM', 'Prohibited clipboard operation (copy/cut/paste) attempted.');
+      onViolationRef.current('DEVTOOLS_SUSPECT', 'MEDIUM', 'Prohibited clipboard operation (copy/cut/paste) attempted.');
     };
 
     // 5. Prohibited hotkeys & DevTools prevention
@@ -105,11 +108,13 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
       // F12 (DevTools)
       if (e.key === 'F12') {
         e.preventDefault();
-        onViolation('DEVTOOLS_SUSPECT', 'HIGH', 'Attempted to open Developer Tools via F12.');
+        onViolationRef.current('DEVTOOLS_SUSPECT', 'HIGH', 'Attempted to open Developer Tools via F12.');
       }
-      // Alt key tracking
-      if (e.altKey && e.key === 'Tab') {
-        triggerSwitchViolation('Alt+Tab Hotkey');
+      // Alt key tracking (Alt+Tab, Alt+F4, Alt+Space)
+      if (e.altKey || e.key === 'Alt') {
+        if (e.key === 'Tab' || e.key === 'Escape' || e.key === 'F4') {
+          triggerSwitchViolation('Alt+Tab / Task Switch Shortcut');
+        }
       }
       // Ctrl+C, Ctrl+V, Ctrl+U, Ctrl+Shift+I, Ctrl+Shift+J
       if (e.ctrlKey || e.metaKey) {
@@ -118,7 +123,7 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
         }
         if (e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase())) {
           e.preventDefault();
-          onViolation('DEVTOOLS_SUSPECT', 'HIGH', 'Attempted developer console shortcut.');
+          onViolationRef.current('DEVTOOLS_SUSPECT', 'HIGH', 'Attempted developer console shortcut.');
         }
       }
     };
@@ -144,7 +149,7 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
       document.removeEventListener('paste', handleCopyCutPaste);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isActive, onViolation]);
+  }, [isActive]);
 
   return {
     isFullscreen,
@@ -155,3 +160,4 @@ export function useAntiCheating({ isActive, onViolation }: AntiCheatingOptions) 
     dismissFullscreenWarning: () => setFullscreenWarning(false),
   };
 }
+

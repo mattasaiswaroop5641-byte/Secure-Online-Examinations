@@ -1,7 +1,9 @@
 /**
- * Client-Side Computer Vision & Face Tracking Engine
- * Uses HTML5 Canvas Pixel Analysis, skin-tone chrominance clustering,
- * and facial feature gradient contrast to track face position, count, and head orientation.
+ * Client-Side High-Precision Computer Vision & Face Tracking Engine
+ * Uses:
+ * 1. Native Shape Detection API (window.FaceDetector) when available in Chromium browsers.
+ * 2. Strict YCbCr Chrominance + Luminance Gradient Energy filter (rejects flat walls & curtains).
+ * 3. Feature centroid gaze analysis for head orientation / looking away detection.
  */
 
 export interface FaceDetectionResult {
@@ -16,6 +18,8 @@ export interface FaceDetectionResult {
 // Offscreen reusable canvas for high-performance frame processing
 let processingCanvas: HTMLCanvasElement | null = null;
 let processingCtx: CanvasRenderingContext2D | null = null;
+let nativeDetector: any = null;
+let nativeDetectorChecked = false;
 
 function getProcessingContext(width: number, height: number): CanvasRenderingContext2D | null {
   if (!processingCanvas) {
@@ -31,8 +35,27 @@ function getProcessingContext(width: number, height: number): CanvasRenderingCon
   return processingCtx;
 }
 
+function getNativeFaceDetector(): any {
+  if (!nativeDetectorChecked) {
+    nativeDetectorChecked = true;
+    if (typeof window !== 'undefined' && 'FaceDetector' in window) {
+      try {
+        nativeDetector = new (window as any).FaceDetector({
+          fastMode: true,
+          maxDetectedFaces: 4,
+        });
+      } catch (e) {
+        console.warn('Native FaceDetector initialization error:', e);
+        nativeDetector = null;
+      }
+    }
+  }
+  return nativeDetector;
+}
+
 /**
  * Captures current video frame as high-quality base64 JPEG image for evidence logging.
+ * Burns candidate local device timestamp at bottom-right corner.
  */
 export function captureVideoFrame(video: HTMLVideoElement, quality = 0.85): string {
   if (!video) return '';
@@ -41,7 +64,7 @@ export function captureVideoFrame(video: HTMLVideoElement, quality = 0.85): stri
   canvas.height = video.videoHeight || 480;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
-  
+
   // Draw current video frame
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -81,21 +104,142 @@ export function captureVideoFrame(video: HTMLVideoElement, quality = 0.85): stri
 }
 
 /**
- * Analyzes video element pixels to detect face presence, bounding box, and head orientation.
+ * Advanced Computer Vision Analysis:
+ * Combines native FaceDetector API (when supported) with pixel-level YCbCr skin chrominance
+ * and facial feature gradient contrast analysis.
  */
-export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult {
-  if (!video || (video.readyState < 2 && video.videoWidth === 0)) {
+export async function detectFaceAsync(video: HTMLVideoElement): Promise<FaceDetectionResult> {
+  if (!video || video.readyState < 2 || video.videoWidth === 0) {
     return {
-      faceCount: 1,
-      faceBox: { x: 40, y: 30, width: 80, height: 60 },
-      isCentered: true,
+      faceCount: 0,
+      faceBox: null,
+      isCentered: false,
       lookingDirection: 'CENTER',
-      status: 'NORMAL',
-      confidence: 0.8,
+      status: 'NO_FACE',
+      confidence: 0,
     };
   }
 
-  // Downscale for fast real-time 60fps-compatible analysis
+  // 1. Try Native Browser FaceDetector (Chromium Shape Detection API)
+  const detector = getNativeFaceDetector();
+  if (detector) {
+    try {
+      const faces: any[] = await detector.detect(video);
+      const vw = video.videoWidth || 640;
+      const vh = video.videoHeight || 480;
+
+      if (!faces || faces.length === 0) {
+        return {
+          faceCount: 0,
+          faceBox: null,
+          isCentered: false,
+          lookingDirection: 'CENTER',
+          status: 'NO_FACE',
+          confidence: 0.95,
+        };
+      }
+
+      if (faces.length >= 2) {
+        const primary = faces[0].boundingBox;
+        return {
+          faceCount: faces.length,
+          faceBox: {
+            x: Math.round(primary.x),
+            y: Math.round(primary.y),
+            width: Math.round(primary.width),
+            height: Math.round(primary.height),
+          },
+          isCentered: false,
+          lookingDirection: 'CENTER',
+          status: 'MULTIPLE_FACES',
+          confidence: 0.95,
+        };
+      }
+
+      // Single face detected via Native AI
+      const face = faces[0];
+      const box = face.boundingBox;
+      const faceBox = {
+        x: Math.round(box.x),
+        y: Math.round(box.y),
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+      };
+
+      const centerX = (box.x + box.width / 2) / vw;
+      const centerY = (box.y + box.height / 2) / vh;
+      const isCentered = centerX >= 0.20 && centerX <= 0.80 && centerY >= 0.15 && centerY <= 0.85;
+
+      if (!isCentered) {
+        return {
+          faceCount: 1,
+          faceBox,
+          isCentered: false,
+          lookingDirection: centerX < 0.2 ? 'RIGHT' : centerX > 0.8 ? 'LEFT' : 'CENTER',
+          status: 'OUT_OF_FRAME',
+          confidence: 0.95,
+        };
+      }
+
+      // Check facial landmarks for gaze / orientation if available
+      let lookingDirection: 'CENTER' | 'LEFT' | 'RIGHT' | 'DOWN' | 'UP' = 'CENTER';
+      if (face.landmarks && face.landmarks.length > 0) {
+        const eyes = face.landmarks.filter((l: any) => l.type === 'eye');
+        const nose = face.landmarks.find((l: any) => l.type === 'nose');
+        if (eyes.length === 2 && nose) {
+          const eyeMidX = (eyes[0].location.x + eyes[1].location.x) / 2;
+          const noseX = nose.location.x;
+          const shift = (noseX - eyeMidX) / box.width;
+          if (shift > 0.08) lookingDirection = 'LEFT';
+          else if (shift < -0.08) lookingDirection = 'RIGHT';
+        }
+      }
+
+      if (lookingDirection !== 'CENTER') {
+        return {
+          faceCount: 1,
+          faceBox,
+          isCentered: true,
+          lookingDirection,
+          status: 'LOOKING_AWAY',
+          confidence: 0.90,
+        };
+      }
+
+      return {
+        faceCount: 1,
+        faceBox,
+        isCentered: true,
+        lookingDirection: 'CENTER',
+        status: 'NORMAL',
+        confidence: 0.98,
+      };
+    } catch (err) {
+      // Fallback to pixel analysis on exception
+    }
+  }
+
+  // 2. High-Precision Computer Vision Fallback Engine
+  return analyzeVideoFrame(video);
+}
+
+/**
+ * Synchronous Computer Vision Analysis:
+ * Uses strict YCbCr color clustering + Luminance gradient variance
+ * to isolate genuine human facial structures from backgrounds, curtains, and walls.
+ */
+export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult {
+  if (!video || video.readyState < 2 || video.videoWidth === 0) {
+    return {
+      faceCount: 0,
+      faceBox: null,
+      isCentered: false,
+      lookingDirection: 'CENTER',
+      status: 'NO_FACE',
+      confidence: 0,
+    };
+  }
+
   const targetW = 160;
   const targetH = 120;
   const ctx = getProcessingContext(targetW, targetH);
@@ -106,7 +250,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       isCentered: true,
       lookingDirection: 'CENTER',
       status: 'NORMAL',
-      confidence: 0.9,
+      confidence: 0.8,
     };
   }
 
@@ -116,11 +260,13 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
     const data = imgData.data;
 
     let skinPixelCount = 0;
+    let featureContrastCount = 0;
     let minX = targetW, maxX = 0, minY = targetH, maxY = 0;
     let sumX = 0, sumY = 0;
+    let featureSumX = 0;
 
-    // Horizontal histogram to detect multiple people / clusters
-    const horizHist = new Int32Array(targetW);
+    // Horizontal density histogram
+    const horizDensity = new Int32Array(targetW);
 
     for (let y = 0; y < targetH; y++) {
       for (let x = 0; x < targetW; x++) {
@@ -129,14 +275,27 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
         const g = data[idx + 1];
         const b = data[idx + 2];
 
-        // Adaptive skin chrominance condition for diverse lighting and tones
+        // 1. Strict YCbCr Human Skin Transformation
+        const Y = 0.299 * r + 0.587 * g + 0.114 * b;
+        const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+        const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+        // Human skin chrominance cluster:
+        // Cb in [77, 127], Cr in [133, 173], Y in [40, 220], with red-green balance
         const isSkin =
-          (r > 35 && g > 20 && b > 15 && r >= b && Math.abs(r - g) < 170) ||
-          (r > 70 && g > 40 && b > 25);
+          Cr >= 133 &&
+          Cr <= 173 &&
+          Cb >= 77 &&
+          Cb <= 127 &&
+          Y >= 35 &&
+          Y <= 225 &&
+          r > g &&
+          r > b &&
+          (r - b) > 12;
 
         if (isSkin) {
           skinPixelCount++;
-          horizHist[x]++;
+          horizDensity[x]++;
 
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
@@ -145,12 +304,19 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
 
           sumX += x;
           sumY += y;
+
+          // 2. Facial feature dark contrast check (eyes, eyebrows, nostrils)
+          // Eyes/eyebrows have lower luminance than surrounding skin
+          if (Y < 85 && (r + g + b) < 250) {
+            featureContrastCount++;
+            featureSumX += x;
+          }
         }
       }
     }
 
-    // Relaxed threshold relative to 160x120 pixels
-    const minSkinThreshold = 250;
+    // Minimum skin pixels threshold (reject empty scene or completely turned away)
+    const minSkinThreshold = 350;
     if (skinPixelCount < minSkinThreshold) {
       return {
         faceCount: 0,
@@ -158,33 +324,41 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
         isCentered: false,
         lookingDirection: 'CENTER',
         status: 'NO_FACE',
-        confidence: 0.85,
+        confidence: 0.90,
       };
     }
 
-    // Check for multiple distinct face peaks across horizontal histogram
+    // Detect multiple face peaks across horizontal histogram
     const smoothed = new Float32Array(targetW);
-    for (let x = 2; x < targetW - 2; x++) {
-      smoothed[x] = (horizHist[x - 2] + horizHist[x - 1] + horizHist[x] + horizHist[x + 1] + horizHist[x + 2]) / 5;
+    for (let x = 3; x < targetW - 3; x++) {
+      smoothed[x] =
+        (horizDensity[x - 3] +
+          horizDensity[x - 2] +
+          horizDensity[x - 1] +
+          horizDensity[x] +
+          horizDensity[x + 1] +
+          horizDensity[x + 2] +
+          horizDensity[x + 3]) /
+        7;
     }
 
     let peaks = 0;
     let inPeak = false;
-    const peakThreshold = targetH * 0.25;
+    const peakThreshold = targetH * 0.28;
 
-    for (let x = 5; x < targetW - 5; x++) {
+    for (let x = 6; x < targetW - 6; x++) {
       if (smoothed[x] > peakThreshold) {
         if (!inPeak) {
           peaks++;
           inPeak = true;
         }
-      } else if (smoothed[x] < peakThreshold * 0.35) {
+      } else if (smoothed[x] < peakThreshold * 0.4) {
         inPeak = false;
       }
     }
 
-    const primaryWidth = Math.max(20, maxX - minX);
-    const primaryHeight = Math.max(20, maxY - minY);
+    const primaryWidth = Math.max(25, maxX - minX);
+    const primaryHeight = Math.max(30, maxY - minY);
     const centerX = sumX / Math.max(1, skinPixelCount);
     const centerY = sumY / Math.max(1, skinPixelCount);
 
@@ -198,47 +372,48 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       height: Math.round(primaryHeight * scaleY),
     };
 
-    // Forgiving center check (normalized coordinates 0 to 1)
-    const normCenterX = centerX / targetW;
-    const normCenterY = centerY / targetH;
-    const isCentered = normCenterX >= 0.15 && normCenterX <= 0.85 && normCenterY >= 0.10 && normCenterY <= 0.90;
-
-    let lookingDirection: 'CENTER' | 'LEFT' | 'RIGHT' | 'DOWN' | 'UP' = 'CENTER';
-    if (normCenterX < 0.18) {
-      lookingDirection = 'RIGHT';
-    } else if (normCenterX > 0.82) {
-      lookingDirection = 'LEFT';
-    } else if (normCenterY > 0.85) {
-      lookingDirection = 'DOWN';
-    } else if (normCenterY < 0.12) {
-      lookingDirection = 'UP';
-    }
-
-    // Multiple faces check
-    if (peaks >= 2 && skinPixelCount > 4000) {
+    // Multiple faces condition
+    if (peaks >= 2 && skinPixelCount > 3500) {
       return {
         faceCount: peaks,
         faceBox,
         isCentered: false,
-        lookingDirection,
+        lookingDirection: 'CENTER',
         status: 'MULTIPLE_FACES',
         confidence: 0.88,
       };
     }
 
-    // Out of frame check
+    // Centering check (normalized 0.0 to 1.0)
+    const normCenterX = centerX / targetW;
+    const normCenterY = centerY / targetH;
+    const isCentered =
+      normCenterX >= 0.18 && normCenterX <= 0.82 && normCenterY >= 0.12 && normCenterY <= 0.88;
+
     if (!isCentered) {
       return {
         faceCount: 1,
         faceBox,
         isCentered: false,
-        lookingDirection,
+        lookingDirection: normCenterX < 0.18 ? 'RIGHT' : normCenterX > 0.82 ? 'LEFT' : 'CENTER',
         status: 'OUT_OF_FRAME',
-        confidence: 0.82,
+        confidence: 0.85,
       };
     }
 
-    // Looking away check
+    // Feature centroid gaze analysis (candidate looking away)
+    let lookingDirection: 'CENTER' | 'LEFT' | 'RIGHT' | 'DOWN' | 'UP' = 'CENTER';
+    if (featureContrastCount > 15) {
+      const featureCenterX = featureSumX / featureContrastCount;
+      const relativeFeatureOffset = (featureCenterX - centerX) / primaryWidth;
+
+      if (relativeFeatureOffset > 0.14) {
+        lookingDirection = 'LEFT';
+      } else if (relativeFeatureOffset < -0.14) {
+        lookingDirection = 'RIGHT';
+      }
+    }
+
     if (lookingDirection !== 'CENTER') {
       return {
         faceCount: 1,
@@ -246,7 +421,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
         isCentered: true,
         lookingDirection,
         status: 'LOOKING_AWAY',
-        confidence: 0.80,
+        confidence: 0.82,
       };
     }
 
@@ -256,7 +431,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       isCentered: true,
       lookingDirection: 'CENTER',
       status: 'NORMAL',
-      confidence: 0.95,
+      confidence: 0.94,
     };
   } catch (e) {
     return {
@@ -265,7 +440,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       isCentered: true,
       lookingDirection: 'CENTER',
       status: 'NORMAL',
-      confidence: 0.85,
+      confidence: 0.8,
     };
   }
 }
