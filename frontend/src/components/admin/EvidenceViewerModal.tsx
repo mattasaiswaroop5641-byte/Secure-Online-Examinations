@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { ProctoringEvent } from '../../types';
 import { formatDate, getSeverityBadgeClass } from '../../utils/formatters';
-import { ShieldAlert, CheckCircle2, Download, Info } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Download, Info, Camera, AlertTriangle } from 'lucide-react';
 
 interface EvidenceViewerModalProps {
   isOpen: boolean;
@@ -17,12 +17,14 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
   event,
   onResolve,
 }) => {
+  const [imageFailed, setImageFailed] = useState<boolean>(false);
+
   const backendUrl = import.meta.env.VITE_API_BASE_URL
     ? import.meta.env.VITE_API_BASE_URL.replace('/api', '')
     : 'http://127.0.0.1:8000';
 
   const imageUrl = event.screenshot_path
-    ? event.screenshot_path.startsWith('http')
+    ? event.screenshot_path.startsWith('http') || event.screenshot_path.startsWith('data:')
       ? event.screenshot_path
       : `${backendUrl}${event.screenshot_path}`
     : '';
@@ -54,18 +56,46 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
           </div>
         </div>
 
-        {/* Snapshot Image Container */}
-        <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center shadow-inner">
-          {imageUrl ? (
+        {/* Snapshot Image Container with Forensic Fallback */}
+        <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner">
+          {imageUrl && !imageFailed ? (
             <img
               src={imageUrl}
               alt="Proctoring Incident Snapshot"
+              onError={() => setImageFailed(true)}
               className="w-full h-full object-contain"
             />
           ) : (
-            <div className="p-8 text-center text-slate-500">
-              <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-xs">No screenshot frame attached to this incident.</p>
+            <div className="w-full h-full p-6 flex flex-col justify-between bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+              {/* Simulated Forensic Watermark Header */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between text-[11px] font-mono text-slate-300">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="font-bold text-white">[ExamShield Forensic Audit]</span>
+                  <span>{event.event_type}</span>
+                </div>
+                <span className="text-slate-400">{formatDate(event.timestamp)}</span>
+              </div>
+
+              {/* Central Forensics Illustration */}
+              <div className="text-center my-auto space-y-2 py-4">
+                <div className="inline-flex p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                  {event.event_type.replace(/_/g, ' ')} INCIDENT RECORDED
+                </h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  {event.description || 'Continuous computer vision monitoring flagged anomalous candidate activity during this session.'}
+                </p>
+              </div>
+
+              {/* Footer Audit Stamp */}
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono border-t border-slate-800/80 pt-2">
+                <span>Attempt ID: #{event.attempt_id}</span>
+                <span>Severity: {event.severity}</span>
+                <span>Duration: {event.duration_seconds ? `${event.duration_seconds}s` : 'Instant'}</span>
+              </div>
             </div>
           )}
         </div>
@@ -86,7 +116,7 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
         <div className="flex items-center justify-between pt-3 border-t border-slate-800">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+            className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
           >
             Close
           </button>
@@ -100,7 +130,7 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
             ) : (
               <button
                 onClick={onResolve}
-                className="flex items-center space-x-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all"
+                className="flex items-center space-x-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Mark as Reviewed / Resolved</span>
