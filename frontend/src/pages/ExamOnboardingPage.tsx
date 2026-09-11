@@ -217,13 +217,15 @@ export const ExamOnboardingPage: React.FC<ExamOnboardingPageProps> = ({
       )}
 
       {/* STEP 3: Face Verification */}
-      {step === 'face_verification' && mediaStream && (
+      {step === 'face_verification' && (
         <FaceVerificationStep
           stream={mediaStream}
+          onStreamUpdate={(s) => setMediaStream(s)}
           onVerified={handleFaceVerified}
           onBack={() => setStep('system_check')}
         />
       )}
+
 
       {/* STEP 4: Rules & Consent */}
       {step === 'rules_consent' && (

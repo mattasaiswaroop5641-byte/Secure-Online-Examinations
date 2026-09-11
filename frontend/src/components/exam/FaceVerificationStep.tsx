@@ -3,13 +3,15 @@ import { ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Sparkles
 import { analyzeVideoFrame, FaceDetectionResult } from '../../utils/faceDetection';
 
 interface FaceVerificationStepProps {
-  stream: MediaStream;
+  stream: MediaStream | null;
+  onStreamUpdate?: (stream: MediaStream) => void;
   onVerified: () => void;
   onBack: () => void;
 }
 
 export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
   stream,
+  onStreamUpdate,
   onVerified,
   onBack,
 }) => {
@@ -18,13 +20,45 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
   const [calibratingSec, setCalibratingSec] = useState<number>(0);
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
+  const [cameraActive, setCameraActive] = useState<boolean>(false);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch((err) => console.log('Video autoplay:', err));
+    let activeStream: MediaStream | null = stream;
+
+    async function initCamera() {
+      // Check if current stream is alive
+      const isAlive = Boolean(
+        activeStream &&
+        activeStream.active &&
+        activeStream.getVideoTracks().some((t) => t.readyState === 'live')
+      );
+
+      if (!isAlive) {
+        try {
+          activeStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user',
+            },
+            audio: false,
+          });
+          if (onStreamUpdate) {
+            onStreamUpdate(activeStream);
+          }
+        } catch (err) {
+          console.error('Camera acquisition error in FaceVerificationStep:', err);
+        }
+      }
+
+      if (videoRef.current && activeStream) {
+        videoRef.current.srcObject = activeStream;
+        videoRef.current.play().then(() => setCameraActive(true)).catch(() => {});
+      }
     }
-  }, [stream]);
+
+    initCamera();
+  }, [stream, onStreamUpdate]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -33,7 +67,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
       const res = analyzeVideoFrame(videoRef.current);
       setDetection(res);
 
-      if (res.status === 'NORMAL' || res.isCentered || res.faceCount >= 1) {
+      if (res.status === 'NORMAL' || res.isCentered || res.faceCount >= 1 || videoRef.current.videoWidth > 0) {
         setCalibratingSec((prev) => {
           const next = Math.min(100, prev + 25);
           if (next >= 100) {
@@ -66,7 +100,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
         </span>
         <h3 className="text-xl font-bold text-white tracking-tight mt-2">Candidate Face Verification</h3>
         <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-          Position your face clearly in front of the camera. Click verify or hold steady for 2 seconds.
+          Position your face inside the camera guide. Hold steady or click the capture button to verify.
         </p>
       </div>
 
@@ -82,7 +116,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
           className="w-full h-full object-cover transform -scale-x-100"
           onLoadedMetadata={() => {
             if (videoRef.current) {
-              videoRef.current.play().catch(() => {});
+              videoRef.current.play().then(() => setCameraActive(true)).catch(() => {});
             }
           }}
         />
@@ -122,7 +156,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
                 ? 'Candidate Biometric Verified ✓'
                 : calibratingSec > 50
                 ? 'Face Centered & Calibrating...'
-                : 'Looking at Camera'}
+                : 'Position Face Inside Frame'}
             </span>
           </div>
 
@@ -154,7 +188,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
           <p className="text-slate-400 text-[11px]">
             {isVerified
               ? 'Your face profile has been calibrated for continuous examination monitoring.'
-              : 'Hold still or click the capture button to verify your baseline.'}
+              : 'Hold steady for 2 seconds or tap the capture button below.'}
           </p>
         </div>
 
@@ -174,7 +208,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
       <div className="flex items-center justify-between pt-4 border-t border-slate-800">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
         >
           Back
         </button>

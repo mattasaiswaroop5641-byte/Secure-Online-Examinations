@@ -31,7 +31,9 @@ export function useWebcam() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.play().catch(() => {});
       }
+      return mediaStream;
     } catch (err: any) {
       console.error('Camera access error:', err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -44,6 +46,7 @@ export function useWebcam() {
         setStatus('error');
         setErrorMessage(err.message || 'Unable to access camera.');
       }
+      return null;
     }
   }, []);
 
@@ -62,16 +65,8 @@ export function useWebcam() {
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
     }
-  }, [stream]);
-
-  // Clean up tracks on unmount
-  useEffect(() => {
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    };
   }, [stream]);
 
   return {
