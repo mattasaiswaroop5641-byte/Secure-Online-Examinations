@@ -25,13 +25,13 @@ async def get_dashboard_metrics(
 
     total_attempts = len(attempts)
     active_attempts = [a for a in attempts if a.get("status") == "in_progress"]
-    completed_attempts = [a for a in attempts if a.get("status") in ["submitted", "timed_out"]]
+    completed_attempts = [a for a in attempts if a.get("status") in ["submitted", "timed_out", "terminated"]]
     
     avg_score = 0.0
     if completed_attempts:
         avg_score = round(sum(float(a.get("percentage", 0.0)) for a in completed_attempts) / len(completed_attempts), 1)
 
-    suspicious_attempts = [a for a in attempts if float(a.get("proctoring_score", 100.0)) < 70.0 or int(a.get("violation_count", 0)) >= 3]
+    suspicious_attempts = [a for a in attempts if float(a.get("proctoring_score", 100.0)) < 70.0 or int(a.get("violation_count", 0)) >= 3 or a.get("status") == "terminated"]
     total_violations = await db["proctoring_incidents"].count_documents({})
 
     # Violation types breakdown using MongoDB aggregation
@@ -42,7 +42,7 @@ async def get_dashboard_metrics(
     violation_types_data = {v["_id"]: v["count"] for v in violation_counts if v.get("_id")}
 
     # Recent attempts
-    recent_attempts_cursor = db["attempts"].find({}).sort("id", -1).limit(10)
+    recent_attempts_cursor = db["attempts"].find({}).sort("id", -1).limit(15)
     recent_attempts = []
     async for att in recent_attempts_cursor:
         exam = await db["exams"].find_one({"id": att["exam_id"]})
@@ -60,6 +60,7 @@ async def get_dashboard_metrics(
                 "percentage": float(att.get("percentage", 0.0)),
                 "proctoring_score": float(att.get("proctoring_score", 100.0)),
                 "violation_count": int(att.get("violation_count", 0)),
+                "termination_reason": att.get("termination_reason"),
                 "start_time": att.get("start_time"),
                 "submitted_at": att.get("submitted_at")
             })

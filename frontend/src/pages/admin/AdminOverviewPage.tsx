@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { analyticsService } from '../../services/analytics';
 import { DashboardMetrics } from '../../types';
 import { StatsCard } from '../../components/admin/StatsCard';
+import { LiveStreamControls } from '../../components/admin/LiveStreamControls';
+import { KickCandidateModal } from '../../components/admin/KickCandidateModal';
+import { LiveCandidateWatchModal } from '../../components/admin/LiveCandidateWatchModal';
 import { formatDate } from '../../utils/formatters';
 import {
   Users,
@@ -13,10 +16,9 @@ import {
   TrendingUp,
   AlertTriangle,
   ArrowRight,
-  Radio,
-  RefreshCw,
   Activity,
-  PlayCircle,
+  UserX,
+  Eye,
 } from 'lucide-react';
 
 interface AdminOverviewPageProps {
@@ -31,8 +33,18 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLive, setIsLive] = useState<boolean>(true);
+  const [intervalSeconds, setIntervalSeconds] = useState<number>(3);
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [selectedKickAttempt, setSelectedKickAttempt] = useState<{
+    id: number;
+    name?: string;
+    exam?: string;
+  } | null>(null);
+  const [selectedLiveWatchAttempt, setSelectedLiveWatchAttempt] = useState<{
+    id: number;
+    name?: string;
+  } | null>(null);
 
   const loadMetrics = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsRefreshing(true);
@@ -57,10 +69,10 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
     if (!isLive) return;
     const intervalId = setInterval(() => {
       loadMetrics(true);
-    }, 3500);
+    }, intervalSeconds * 1000);
 
     return () => clearInterval(intervalId);
-  }, [isLive, loadMetrics]);
+  }, [isLive, intervalSeconds, loadMetrics]);
 
   if (isLoading && !metrics) {
     return (
@@ -78,7 +90,7 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
 
   return (
     <div className="p-6 sm:p-8 space-y-8">
-      {/* Header with Live Status Stream Controls */}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">Institutional Overview</h2>
@@ -86,42 +98,19 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
             Real-time assessment telemetry, active candidate sessions, and proctoring forensic alerts.
           </p>
         </div>
-
-        <div className="flex items-center space-x-3">
-          {/* Live Stream Switch Badge */}
-          <button
-            onClick={() => setIsLive((prev) => !prev)}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              isLive
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <span className="relative flex h-2 w-2">
-              {isLive && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              )}
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  isLive ? 'bg-emerald-500' : 'bg-slate-500'
-                }`}
-              />
-            </span>
-            <span>{isLive ? 'Live Stream Active (3.5s)' : 'Live Polling Paused'}</span>
-          </button>
-
-          {/* Manual Refresh Button */}
-          <button
-            onClick={() => loadMetrics(false)}
-            disabled={isRefreshing}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-            title="Manual Sync"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
-            <span className="hidden sm:inline">Sync Now</span>
-          </button>
-        </div>
       </div>
+
+      {/* Live Stream Controls Bar */}
+      <LiveStreamControls
+        isLive={isLive}
+        onToggleLive={() => setIsLive((prev) => !prev)}
+        intervalSeconds={intervalSeconds}
+        onChangeInterval={(sec) => setIntervalSeconds(sec)}
+        onManualSync={() => loadMetrics(false)}
+        isSyncing={isRefreshing}
+        lastSyncTime={lastSync}
+        activeCount={kpis?.active_attempts}
+      />
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -260,6 +249,8 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
                 {metrics?.recent_attempts && metrics.recent_attempts.length > 0 ? (
                   metrics.recent_attempts.slice(0, 6).map((att) => {
                     const isInProgress = att.status === 'in_progress';
+                    const isTerminated = att.status === 'terminated';
+
                     return (
                       <tr key={att.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="p-2.5">
@@ -274,6 +265,10 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                               <span>Live</span>
+                            </span>
+                          ) : isTerminated ? (
+                            <span className="text-[10px] font-bold text-rose-300 uppercase bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 rounded-md">
+                              Terminated
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-800 px-2 py-0.5 rounded-md">
@@ -299,12 +294,33 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
                           </span>
                         </td>
                         <td className="p-2.5 text-right">
-                          <button
-                            onClick={() => onViewAttempt(att.id)}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            Review
-                          </button>
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {isInProgress && (
+                              <>
+                                <button
+                                  onClick={() => setSelectedLiveWatchAttempt({ id: att.id, name: att.student_name })}
+                                  className="flex items-center space-x-1 px-2 py-1 bg-indigo-600/15 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Silent Live Candidate Video Stream"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Watch</span>
+                                </button>
+                                <button
+                                  onClick={() => setSelectedKickAttempt({ id: att.id, name: att.student_name, exam: att.exam_title })}
+                                  className="px-2 py-1 bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  title="Kick Candidate"
+                                >
+                                  Kick
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => onViewAttempt(att.id)}
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Review
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -321,6 +337,35 @@ export const AdminOverviewPage: React.FC<AdminOverviewPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Silent Live Candidate Watch Modal */}
+      {selectedLiveWatchAttempt && (
+        <LiveCandidateWatchModal
+          isOpen={Boolean(selectedLiveWatchAttempt)}
+          onClose={() => setSelectedLiveWatchAttempt(null)}
+          attemptId={selectedLiveWatchAttempt.id}
+          candidateName={selectedLiveWatchAttempt.name}
+          onCandidateKicked={() => {
+            setSelectedLiveWatchAttempt(null);
+            loadMetrics(false);
+          }}
+        />
+      )}
+
+      {/* Kick Modal */}
+      {selectedKickAttempt && (
+        <KickCandidateModal
+          isOpen={Boolean(selectedKickAttempt)}
+          onClose={() => setSelectedKickAttempt(null)}
+          attemptId={selectedKickAttempt.id}
+          candidateName={selectedKickAttempt.name}
+          examTitle={selectedKickAttempt.exam}
+          onSuccess={() => {
+            setSelectedKickAttempt(null);
+            loadMetrics(false);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -226,15 +226,10 @@ export async function detectFaceAsync(video: HTMLVideoElement): Promise<FaceDete
         const nose = face.landmarks.find((l: any) => l.type === 'nose');
         if (eyes.length === 2 && nose) {
           const eyeMidX = (eyes[0].location.x + eyes[1].location.x) / 2;
-          const eyeMidY = (eyes[0].location.y + eyes[1].location.y) / 2;
           const noseX = nose.location.x;
-          const noseY = nose.location.y;
-          const shiftX = (noseX - eyeMidX) / box.width;
-          const shiftY = (noseY - eyeMidY) / box.height;
-          if (shiftX > 0.08) lookingDirection = 'LEFT';
-          else if (shiftX < -0.08) lookingDirection = 'RIGHT';
-          else if (shiftY > 0.35) lookingDirection = 'DOWN';
-          else if (shiftY < 0.12) lookingDirection = 'UP';
+          const shift = (noseX - eyeMidX) / box.width;
+          if (shift > 0.08) lookingDirection = 'LEFT';
+          else if (shift < -0.08) lookingDirection = 'RIGHT';
         }
       }
 
@@ -380,7 +375,6 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
     let minX = targetW, maxX = 0, minY = targetH, maxY = 0;
     let sumX = 0, sumY = 0;
     let featureSumX = 0;
-    let featureSumY = 0;
 
     // Horizontal density histogram
     const horizDensity = new Int32Array(targetW);
@@ -455,7 +449,6 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
           if (Y < 75 && (r + g + b) < 220) {
             eyeContrastCount++;
             featureSumX += x;
-            featureSumY += y;
           }
         }
       }
@@ -514,30 +507,17 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
       };
     }
 
-    // Feature centroid gaze analysis (horizontal & vertical gaze/tilt)
+    // Feature centroid gaze analysis
     let lookingDirection: 'CENTER' | 'LEFT' | 'RIGHT' | 'DOWN' | 'UP' = 'CENTER';
-    if (eyeContrastCount > 18) {
+    if (eyeContrastCount > 20) {
       const featureCenterX = featureSumX / eyeContrastCount;
-      const featureCenterY = featureSumY / eyeContrastCount;
-      const relativeFeatureOffsetX = (featureCenterX - centerX) / primaryWidth;
-      const relativeFeatureOffsetY = (featureCenterY - centerY) / primaryHeight;
+      const relativeFeatureOffset = (featureCenterX - centerX) / primaryWidth;
 
-      if (relativeFeatureOffsetX > 0.14) {
+      if (relativeFeatureOffset > 0.15) {
         lookingDirection = 'LEFT';
-      } else if (relativeFeatureOffsetX < -0.14) {
+      } else if (relativeFeatureOffset < -0.15) {
         lookingDirection = 'RIGHT';
-      } else if (relativeFeatureOffsetY > 0.08) {
-        // Eyes/brows displaced downwards (candidate looking down / phone / desk)
-        lookingDirection = 'DOWN';
-      } else if (relativeFeatureOffsetY < -0.18) {
-        lookingDirection = 'UP';
       }
-    }
-
-    // Aspect ratio check: when head is tilted down or partially obstructed
-    const aspectRatio = primaryHeight / Math.max(1, primaryWidth);
-    if (aspectRatio < 0.65) {
-      lookingDirection = 'DOWN';
     }
 
     if (lookingDirection !== 'CENTER') {
@@ -547,7 +527,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement): FaceDetectionResult 
         isCentered: true,
         lookingDirection,
         status: 'LOOKING_AWAY',
-        confidence: 0.88,
+        confidence: 0.85,
       };
     }
 

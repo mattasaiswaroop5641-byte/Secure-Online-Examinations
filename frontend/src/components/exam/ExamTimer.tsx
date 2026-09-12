@@ -7,9 +7,10 @@ interface ExamTimerProps {
   initialSeconds: number;
   attemptId: number;
   onExpire: () => void;
+  onTerminated?: (reason: string) => void;
 }
 
-export const ExamTimer: React.FC<ExamTimerProps> = ({ initialSeconds, attemptId, onExpire }) => {
+export const ExamTimer: React.FC<ExamTimerProps> = ({ initialSeconds, attemptId, onExpire, onTerminated }) => {
   const [secondsLeft, setSecondsLeft] = useState<number>(initialSeconds);
 
   // Local second-by-second countdown
@@ -33,12 +34,19 @@ export const ExamTimer: React.FC<ExamTimerProps> = ({ initialSeconds, attemptId,
     return () => clearInterval(interval);
   }, [secondsLeft, onExpire]);
 
-  // Periodic authoritative synchronization with server (every 25 seconds)
+  // Periodic fast authoritative synchronization with server (every 3.5 seconds)
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       try {
-        const res = await attemptService.getTimeRemaining(attemptId);
-        if (res.is_expired) {
+        const res: any = await attemptService.getTimeRemaining(attemptId);
+        if (res.status === 'terminated') {
+          setSecondsLeft(0);
+          if (onTerminated) {
+            onTerminated(res.termination_reason || 'Examination terminated by administrator/proctor.');
+          } else {
+            onExpire();
+          }
+        } else if (res.is_expired) {
           setSecondsLeft(0);
           onExpire();
         } else {
@@ -47,10 +55,10 @@ export const ExamTimer: React.FC<ExamTimerProps> = ({ initialSeconds, attemptId,
       } catch (err) {
         console.warn('Timer server sync check failed, using local countdown:', err);
       }
-    }, 25000);
+    }, 3500);
 
     return () => clearInterval(syncInterval);
-  }, [attemptId, onExpire]);
+  }, [attemptId, onExpire, onTerminated]);
 
   // Color dynamics
   const isCritical = secondsLeft < 120; // under 2 mins

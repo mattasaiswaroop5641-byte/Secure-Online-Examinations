@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 import random
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -8,7 +8,8 @@ from app.mongodb import get_database, get_next_sequence
 from app.schemas.auth import UserResponse
 from app.schemas.attempt import (
     StartExamResponse, SaveAnswerRequest, TimeRemainingResponse,
-    AttemptResultResponse, AttemptSummaryAdmin, QuestionAnalysisItem, AnswerState
+    AttemptResultResponse, AttemptSummaryAdmin, QuestionAnalysisItem, AnswerState,
+    KickAttemptRequest
 )
 from app.schemas.question import QuestionStudentResponse, OptionStudentResponse
 from app.services.grading_service import evaluate_attempt, calculate_proctoring_score
@@ -161,12 +162,13 @@ async def get_time_remaining(
     if current_user.role == "student" and attempt["student_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    if attempt.get("status") in ["submitted", "timed_out"]:
+    if attempt.get("status") in ["submitted", "timed_out", "terminated"]:
         return TimeRemainingResponse(
             attempt_id=attempt["id"],
             remaining_seconds=0,
             is_expired=True,
-            status=attempt.get("status")
+            status=attempt.get("status", "submitted"),
+            termination_reason=attempt.get("termination_reason")
         )
 
     now = datetime.utcnow()
@@ -179,14 +181,16 @@ async def get_time_remaining(
             attempt_id=attempt["id"],
             remaining_seconds=0,
             is_expired=True,
-            status="timed_out"
+            status="timed_out",
+            termination_reason=None
         )
 
     return TimeRemainingResponse(
         attempt_id=attempt["id"],
         remaining_seconds=remaining,
         is_expired=False,
-        status=attempt.get("status", "in_progress")
+        status=attempt.get("status", "in_progress"),
+        termination_reason=None
     )
 
 @router.post("/{id}/answer", status_code=status.HTTP_200_OK)
@@ -251,6 +255,74 @@ async def submit_exam(
 
     await evaluate_attempt(id, db)
     await db["attempts"].update_one({"id": id}, {"$set": {"status": "submitted"}})
+
+    return await get_attempt_result(id=id, current_user=current_user, db=db)
+
+@router.post("/{id}/kick", response_model=AttemptResultResponse)
+async def kick_attempt(
+    id: int,
+    payload: Optional[KickAttemptRequest] = None,
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Terminates / kicks an active candidate out of an examination attempt.
+    Records a high-severity PROCTOR_TERMINATED incident, marks attempt as terminated/disqualified,
+    grades current answers with is_passed = False, and records administrator audit trail.
+    """
+    attempt = await db["attempts"].find_one({"id": id})
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    reason = payload.reason if payload and payload.reason else "Disqualified by proctor after forensic evidence review."
+    now = datetime.utcnow()
+
+    # Log PROCTOR_TERMINATED proctoring incident
+    event_id = await get_next_sequence("proctoring_event_id", db)
+    event_doc = {
+        "id": event_id,
+        "attempt_id": attempt["id"],
+        "student_id": attempt["student_id"],
+        "event_type": "PROCTOR_TERMINATED",
+        "severity": "CRITICAL",
+        "timestamp": now,
+        "duration_seconds": 0.0,
+        "description": f"Candidate terminated / kicked out by {current_user.name} ({current_user.role}): {reason}",
+        "screenshot_path": None,
+        "resolved": True,
+        "created_at": now
+    }
+    await db["proctoring_incidents"].insert_one(event_doc)
+
+    # Update attempt status
+    await db["attempts"].update_one(
+        {"id": id},
+        {"$set": {
+            "status": "terminated",
+            "termination_reason": reason,
+            "terminated_by_id": current_user.id,
+            "terminated_by_name": current_user.name,
+            "terminated_at": now,
+            "submitted_at": now,
+            "is_passed": False
+        }}
+    )
+
+    # Evaluate attempt
+    await evaluate_attempt(id, db)
+
+    # Ensure status and is_passed are preserved
+    await db["attempts"].update_one(
+        {"id": id},
+        {"$set": {
+            "status": "terminated",
+            "is_passed": False,
+            "termination_reason": reason,
+            "terminated_by_id": current_user.id,
+            "terminated_by_name": current_user.name,
+            "terminated_at": now
+        }}
+    )
 
     return await get_attempt_result(id=id, current_user=current_user, db=db)
 
@@ -374,6 +446,9 @@ async def get_attempt_result(
         proctoring_score=proc_info["score"],
         violation_count=proc_info["violations_count"],
         proctoring_status=proc_info["status"],
+        termination_reason=attempt.get("termination_reason"),
+        terminated_by_name=attempt.get("terminated_by_name"),
+        terminated_at=attempt.get("terminated_at"),
         questions=analysis_items
     )
 
@@ -415,7 +490,10 @@ async def list_attempts(
                     percentage=float(att.get("percentage", 0.0)),
                     is_passed=att.get("is_passed", False),
                     proctoring_score=float(att.get("proctoring_score", 100.0)),
-                    violation_count=int(att.get("violation_count", 0))
+                    violation_count=int(att.get("violation_count", 0)),
+                    termination_reason=att.get("termination_reason"),
+                    terminated_by_name=att.get("terminated_by_name"),
+                    terminated_at=att.get("terminated_at")
                 )
             )
     return summaries

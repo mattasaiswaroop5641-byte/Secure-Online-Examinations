@@ -12,7 +12,8 @@ from app.routers import (
     questions_router,
     attempts_router,
     proctoring_router,
-    analytics_router
+    analytics_router,
+    admin_db_router
 )
 
 @asynccontextmanager
@@ -53,6 +54,7 @@ app.include_router(questions_router, prefix=settings.API_V1_STR)
 app.include_router(attempts_router, prefix=settings.API_V1_STR)
 app.include_router(proctoring_router, prefix=settings.API_V1_STR)
 app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(admin_db_router, prefix=settings.API_V1_STR)
 
 @app.get("/api/health")
 def health_check():

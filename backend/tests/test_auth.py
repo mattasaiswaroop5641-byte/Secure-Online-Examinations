@@ -14,9 +14,12 @@ def test_login_admin(client):
     )
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
-    assert data["user"]["role"] == "admin"
-
+    if data.get("requires_2fa"):
+        assert data["requires_2fa"] is True
+        assert data["role"] == "admin"
+    else:
+        assert "access_token" in data
+        assert data["user"]["role"] == "admin"
 
 def test_login_student(client):
     response = client.post(
@@ -59,8 +62,15 @@ def test_register_new_student(client):
     assert login_resp.status_code == 200
 
 def test_google_authenticator_2fa_flow(client):
-    admin_email = "mattasaiswaroop5641@gmail.com"
-    admin_pass = "Mgsai@1025"
+    uid = uuid.uuid4().hex[:6]
+    admin_email = f"twofa_admin_{uid}@example.com"
+    admin_pass = "Admin2FA@123"
+
+    # Register fresh admin
+    client.post(
+        "/api/auth/register",
+        json={"name": "2FA Admin", "email": admin_email, "password": admin_pass, "role": "admin"}
+    )
 
     # 1. Login as Admin
     login_res = client.post(

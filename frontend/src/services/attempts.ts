@@ -52,4 +52,11 @@ export const attemptService = {
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return apiRequest<any[]>(`/attempts${queryString}`);
   },
+
+  async kickAttempt(attemptId: number, reason?: string): Promise<AttemptResult> {
+    return apiRequest<AttemptResult>(`/attempts/${attemptId}/kick`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Disqualified by proctor after forensic evidence review.' }),
+    });
+  },
 };

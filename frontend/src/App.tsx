@@ -18,7 +18,8 @@ import { QuestionBankPage } from './pages/admin/QuestionBankPage';
 import { AttemptReviewPage } from './pages/admin/AttemptReviewPage';
 import { ProctoringReportsPage } from './pages/admin/ProctoringReportsPage';
 import { TwoFactorSetupModal } from './components/admin/TwoFactorSetupModal';
-import { ShieldCheck, Sliders, CheckCircle2, Smartphone, ShieldAlert, KeyRound, Lock, AlertCircle } from 'lucide-react';
+import { DatabaseManagementModal } from './components/admin/DatabaseManagementModal';
+import { ShieldCheck, Sliders, CheckCircle2, Smartphone, ShieldAlert, KeyRound, Lock, AlertCircle, Database, Trash2 } from 'lucide-react';
 import { authService } from './services/auth';
 
 const AppContent: React.FC = () => {
@@ -34,6 +35,9 @@ const AppContent: React.FC = () => {
   const [disable2FACode, setDisable2FACode] = useState<string>('');
   const [isDisabling2FA, setIsDisabling2FA] = useState<boolean>(false);
   const [disable2FAError, setDisable2FAError] = useState<string | null>(null);
+
+  // Database Management modal state
+  const [isDbModalOpen, setIsDbModalOpen] = useState<boolean>(false);
 
   // Settings local state
   const [gracePeriod, setGracePeriod] = useState<number>(3);
@@ -263,6 +267,38 @@ const AppContent: React.FC = () => {
               </div>
             </div>
 
+            {/* Database Maintenance & Drop DB Card (Admin Only) */}
+            {user?.role === 'admin' && (
+              <div className="p-6 bg-slate-900 border-2 border-rose-500/30 rounded-3xl space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                      <Database className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                        <span>Database Maintenance & Drop Operations</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
+                          Admin Only
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Purge test attempts, reset to baseline seed data, or perform database collection drops.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsDbModalOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-rose-600/20 transition-all cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Drop / Reset DB</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 2FA Setup Modal */}
             <TwoFactorSetupModal
               isOpen={is2FAModalOpen}
@@ -271,6 +307,17 @@ const AppContent: React.FC = () => {
                 await refreshUser();
               }}
             />
+
+            {/* Database Management Modal */}
+            {isDbModalOpen && (
+              <DatabaseManagementModal
+                isOpen={isDbModalOpen}
+                onClose={() => setIsDbModalOpen(false)}
+                onSuccess={() => {
+                  // reload if needed
+                }}
+              />
+            )}
           </div>
         );
       default:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { attemptService } from '../services/attempts';
+import { proctoringService } from '../services/proctoring';
 import { StartExamResponse, QuestionStudent, AnswerState, ProctoringEventType, ViolationSeverity } from '../types';
 import { useFaceProctor } from '../hooks/useFaceProctor';
 import { useAntiCheating } from '../hooks/useAntiCheating';
@@ -150,6 +151,36 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   });
 
 
+  // Silent Background Live Video Stream to Proctor Server
+  useEffect(() => {
+    if (isLoading || !examData || kickOutNotice || isSubmitting) return;
+
+    const streamCanvas = document.createElement('canvas');
+    streamCanvas.width = 320;
+    streamCanvas.height = 240;
+    const ctx = streamCanvas.getContext('2d');
+
+    const streamInterval = setInterval(async () => {
+      try {
+        if (videoRef.current && videoRef.current.readyState >= 2 && ctx) {
+          ctx.drawImage(videoRef.current, 0, 0, 320, 240);
+          const frameBase64 = streamCanvas.toDataURL('image/jpeg', 0.6);
+          await proctoringService.pushLiveFeed(examData.attempt_id, {
+            image_base64: frameBase64,
+            trust_score: trustScore,
+            violation_count: violationCount,
+            looking_direction: detection?.lookingDirection || 'CENTER',
+            face_count: detection?.faceCount || 1,
+          });
+        }
+      } catch (err) {
+        // Silently ignore to guarantee seamless student experience
+      }
+    }, 1800);
+
+    return () => clearInterval(streamInterval);
+  }, [isLoading, examData, kickOutNotice, isSubmitting, trustScore, violationCount, detection]);
+
   // Request fullscreen on start
   useEffect(() => {
     if (!isLoading && examData) {
@@ -283,6 +314,12 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
             initialSeconds={examData.remaining_seconds}
             attemptId={examData.attempt_id}
             onExpire={handleTimerExpired}
+            onTerminated={(reason) => {
+              setKickOutNotice(reason);
+              setTimeout(() => {
+                handleFinalSubmit();
+              }, 3000);
+            }}
           />
 
           {!isFullscreen && (

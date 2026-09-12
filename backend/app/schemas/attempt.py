@@ -25,11 +25,15 @@ class StartExamResponse(BaseModel):
     questions: List[QuestionStudentResponse]
     current_answers: Dict[int, AnswerState]  # question_id -> state
 
+class KickAttemptRequest(BaseModel):
+    reason: Optional[str] = "Disqualified for proctoring violations after forensic evidence review."
+
 class TimeRemainingResponse(BaseModel):
     attempt_id: int
     remaining_seconds: int
     is_expired: bool
     status: str
+    termination_reason: Optional[str] = None
 
 class QuestionAnalysisItem(BaseModel):
     question_id: int
@@ -74,6 +78,10 @@ class AttemptResultResponse(BaseModel):
     violation_count: int
     proctoring_status: str  # Normal, Warning, Suspicious
     
+    termination_reason: Optional[str] = None
+    terminated_by_name: Optional[str] = None
+    terminated_at: Optional[datetime] = None
+
     questions: Optional[List[QuestionAnalysisItem]] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -96,5 +104,8 @@ class AttemptSummaryAdmin(BaseModel):
     is_passed: bool
     proctoring_score: float
     violation_count: int
+    termination_reason: Optional[str] = None
+    terminated_by_name: Optional[str] = None
+    terminated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

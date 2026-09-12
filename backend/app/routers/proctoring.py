@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
+from pydantic import BaseModel
 
 from app.mongodb import get_database, get_next_sequence
 from app.schemas.auth import UserResponse
@@ -96,6 +97,158 @@ async def log_proctoring_event(
         resolved=event_doc["resolved"],
         created_at=event_doc["created_at"]
     )
+
+
+# -------------------------------------------------------------------------
+# SILENT LIVE CANDIDATE STREAMING & PROCTOR MONITORING BUFFER
+# -------------------------------------------------------------------------
+LIVE_FRAME_BUFFER: Dict[int, Dict[str, Any]] = {}
+
+class LiveFramePushRequest(BaseModel):
+    image_base64: str
+    trust_score: Optional[int] = None
+    violation_count: Optional[int] = None
+    looking_direction: Optional[str] = "CENTER"
+    face_count: Optional[int] = 1
+
+@router.get("/live-active-candidates")
+async def list_active_live_candidates(
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Lists all active in-progress candidates with live camera stream availability.
+    """
+    cursor = db["attempts"].find({"status": "in_progress"}).sort("start_time", -1)
+    now = datetime.now(timezone.utc)
+    results = []
+
+    async for attempt in cursor:
+        student = await db["users"].find_one({"id": attempt["student_id"]})
+        exam = await db["exams"].find_one({"id": attempt["exam_id"]})
+        buffer_data = LIVE_FRAME_BUFFER.get(attempt["id"])
+
+        is_live = False
+        seconds_ago = None
+        preview_thumb = None
+
+        if buffer_data:
+            updated_at = buffer_data["updated_at"]
+            if hasattr(updated_at, "tzinfo") and updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=timezone.utc)
+            diff = (now - updated_at).total_seconds()
+            seconds_ago = round(diff, 1)
+            if diff < 8.0:
+                is_live = True
+            preview_thumb = buffer_data.get("image_base64")
+
+        results.append({
+            "attempt_id": attempt["id"],
+            "student_id": attempt["student_id"],
+            "student_name": student.get("name", "Candidate") if student else "Candidate",
+            "student_email": student.get("email", "") if student else "",
+            "student_code": student.get("student_id", "") if student else "",
+            "exam_id": attempt["exam_id"],
+            "exam_title": exam.get("title", "Exam") if exam else "Exam",
+            "is_live": is_live,
+            "seconds_since_last_frame": seconds_ago,
+            "has_preview": bool(preview_thumb),
+            "trust_score": attempt.get("proctoring_score", 100),
+            "violation_count": attempt.get("violation_count", 0),
+            "start_time": attempt.get("start_time")
+        })
+
+    return results
+
+@router.post("/live-feed/{attempt_id}")
+async def push_live_candidate_frame(
+    attempt_id: int,
+    payload: LiveFramePushRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Silent live candidate webcam heartbeat.
+    Invoked quietly in background by candidate exam arena to update their real-time video frame.
+    No student notification or visible UI response is produced.
+    """
+    attempt = await db["attempts"].find_one({"id": attempt_id})
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    if attempt["student_id"] != current_user.id and current_user.role not in ["admin", "examiner"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    now = datetime.now(timezone.utc)
+    LIVE_FRAME_BUFFER[attempt_id] = {
+        "attempt_id": attempt_id,
+        "student_id": attempt["student_id"],
+        "image_base64": payload.image_base64,
+        "trust_score": payload.trust_score if payload.trust_score is not None else attempt.get("proctoring_score", 100),
+        "violation_count": payload.violation_count if payload.violation_count is not None else attempt.get("violation_count", 0),
+        "looking_direction": payload.looking_direction or "CENTER",
+        "face_count": payload.face_count or 1,
+        "updated_at": now
+    }
+
+    return {"status": "ok", "timestamp": now}
+
+@router.get("/live-feed/{attempt_id}")
+async def get_live_candidate_frame(
+    attempt_id: int,
+    current_user: UserResponse = Depends(require_role(["admin", "examiner"])),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Admin & Examiner Live Video Watch Endpoint.
+    Returns the candidate's latest silent camera frame, status, and AI metrics.
+    """
+    attempt = await db["attempts"].find_one({"id": attempt_id})
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    student = await db["users"].find_one({"id": attempt["student_id"]})
+    exam = await db["exams"].find_one({"id": attempt["exam_id"]})
+
+    buffer_data = LIVE_FRAME_BUFFER.get(attempt_id)
+    now = datetime.now(timezone.utc)
+
+    is_live = False
+    seconds_ago = None
+    image_base64 = None
+    looking_dir = "CENTER"
+    face_count = 1
+
+    if buffer_data:
+        updated_at = buffer_data["updated_at"]
+        if hasattr(updated_at, "tzinfo") and updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+        diff = (now - updated_at).total_seconds()
+        seconds_ago = round(diff, 1)
+        if diff < 8.0 and attempt.get("status") == "in_progress":
+            is_live = True
+        image_base64 = buffer_data["image_base64"]
+        looking_dir = buffer_data.get("looking_direction", "CENTER")
+        face_count = buffer_data.get("face_count", 1)
+
+    return {
+        "attempt_id": attempt_id,
+        "student_id": attempt["student_id"],
+        "student_name": student.get("name", "Candidate") if student else "Candidate",
+        "student_email": student.get("email", "") if student else "",
+        "student_code": student.get("student_id", "") if student else "",
+        "exam_title": exam.get("title", "Exam") if exam else "Exam",
+        "attempt_status": attempt.get("status", "in_progress"),
+        "is_live": is_live,
+        "seconds_since_last_frame": seconds_ago,
+        "image_base64": image_base64,
+        "trust_score": buffer_data.get("trust_score") if (buffer_data and buffer_data.get("trust_score") is not None) else attempt.get("proctoring_score", 100),
+        "violation_count": buffer_data.get("violation_count") if (buffer_data and buffer_data.get("violation_count") is not None) else attempt.get("violation_count", 0),
+        "looking_direction": looking_dir,
+        "face_count": face_count,
+        "start_time": attempt.get("start_time"),
+        "current_time": now
+    }
 
 @router.get("/{attempt_id}", response_model=ProctoringSummaryResponse)
 async def get_proctoring_summary(
@@ -253,4 +406,5 @@ async def clear_proctoring_events(
         )
 
     return {"status": "cleared", "deleted_count": res.deleted_count}
+
 

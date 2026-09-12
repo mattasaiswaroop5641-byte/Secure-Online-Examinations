@@ -55,5 +55,57 @@ export const proctoringService = {
       method: 'DELETE',
     });
   },
+
+  async pushLiveFeed(attemptId: number, data: {
+    image_base64: string;
+    trust_score?: number;
+    violation_count?: number;
+    looking_direction?: string;
+    face_count?: number;
+  }): Promise<{ status: string; timestamp: string }> {
+    return apiRequest<{ status: string; timestamp: string }>(`/proctoring/live-feed/${attemptId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getLiveFeed(attemptId: number): Promise<{
+    attempt_id: number;
+    student_id: number;
+    student_name: string;
+    student_email: string;
+    student_code: string;
+    exam_title: string;
+    attempt_status: string;
+    is_live: boolean;
+    seconds_since_last_frame: number | null;
+    image_base64: string | null;
+    trust_score: number;
+    violation_count: number;
+    looking_direction: string;
+    face_count: number;
+    start_time: string;
+    current_time: string;
+  }> {
+    return apiRequest(`/proctoring/live-feed/${attemptId}`);
+  },
+
+  async listActiveCandidates(): Promise<{
+    attempt_id: number;
+    student_id: number;
+    student_name: string;
+    student_email: string;
+    student_code: string;
+    exam_id: number;
+    exam_title: string;
+    is_live: boolean;
+    seconds_since_last_frame: number | null;
+    has_preview: boolean;
+    trust_score: number;
+    violation_count: number;
+    start_time: string;
+  }[]> {
+    return apiRequest('/proctoring/live-active-candidates');
+  },
 };
 

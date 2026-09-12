@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ProctoringEvent, ViolationSeverity } from '../../types';
 import { ProctoringTimeline } from '../../components/admin/ProctoringTimeline';
+import { LiveStreamControls } from '../../components/admin/LiveStreamControls';
 import { proctoringService } from '../../services/proctoring';
 import { apiRequest } from '../../services/api';
-import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle, Trash2, RefreshCw, Radio } from 'lucide-react';
+import { ShieldAlert, Filter, Search, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
 
 export const ProctoringReportsPage: React.FC = () => {
   const [events, setEvents] = useState<ProctoringEvent[]>([]);
@@ -11,8 +12,10 @@ export const ProctoringReportsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLive, setIsLive] = useState(true);
+  const [intervalSeconds, setIntervalSeconds] = useState<number>(3);
   const [isClearing, setIsClearing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
 
   const loadEvents = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsSyncing(true);
@@ -36,6 +39,7 @@ export const ProctoringReportsPage: React.FC = () => {
       // Sort descending by timestamp
       allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setEvents(allEvents);
+      setLastSyncTime(new Date());
     } catch (err) {
       console.error('Failed to load proctoring reports:', err);
     } finally {
@@ -48,15 +52,15 @@ export const ProctoringReportsPage: React.FC = () => {
     loadEvents(false);
   }, [loadEvents]);
 
-  // Live Auto-Refresh Stream (every 3.0s)
+  // Live Auto-Refresh Stream with configurable interval
   useEffect(() => {
     if (!isLive) return;
     const intervalId = setInterval(() => {
       loadEvents(true);
-    }, 3000);
+    }, intervalSeconds * 1000);
 
     return () => clearInterval(intervalId);
-  }, [isLive, loadEvents]);
+  }, [isLive, intervalSeconds, loadEvents]);
 
   const handleClearAll = async () => {
     if (events.length === 0) return;
@@ -97,48 +101,16 @@ export const ProctoringReportsPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">Proctoring Incident Center</h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Continuous webcam audit records, computer vision forensic alerts, and screenshot evidence.
+            Continuous webcam audit records, computer vision forensic alerts, and live evidence review.
           </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Live Ingestion Switch Badge */}
-          <button
-            onClick={() => setIsLive((prev) => !prev)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              isLive
-                ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <span className="relative flex h-2 w-2">
-              {isLive && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-              )}
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  isLive ? 'bg-rose-500' : 'bg-slate-500'
-                }`}
-              />
-            </span>
-            <span>{isLive ? 'Live Ingestion (3s)' : 'Live Polling Paused'}</span>
-          </button>
-
-          <button
-            onClick={() => loadEvents(false)}
-            disabled={isSyncing}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-            title="Refresh Incident Log"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-cyan-400' : ''}`} />
-            <span>Sync</span>
-          </button>
-
           {events.length > 0 && (
             <button
               onClick={handleClearAll}
               disabled={isClearing}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>{isClearing ? 'Clearing...' : 'Clear All Incidents'}</span>
@@ -146,10 +118,21 @@ export const ProctoringReportsPage: React.FC = () => {
           )}
 
           <span className="text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl font-semibold">
-            {events.length} Total Incident(s) Logged
+            {events.length} Total Incident(s)
           </span>
         </div>
       </div>
+
+      {/* Live Stream Controls Bar */}
+      <LiveStreamControls
+        isLive={isLive}
+        onToggleLive={() => setIsLive((prev) => !prev)}
+        intervalSeconds={intervalSeconds}
+        onChangeInterval={(sec) => setIntervalSeconds(sec)}
+        onManualSync={() => loadEvents(false)}
+        isSyncing={isSyncing}
+        lastSyncTime={lastSyncTime}
+      />
 
       {/* Filter Toolbar */}
       <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -169,7 +152,7 @@ export const ProctoringReportsPage: React.FC = () => {
           <select
             value={selectedSeverity}
             onChange={(e) => setSelectedSeverity(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none cursor-pointer"
           >
             <option value="">All Severities</option>
             <option value="CRITICAL">Critical</option>
@@ -197,6 +180,9 @@ export const ProctoringReportsPage: React.FC = () => {
           }}
           onEventDeleted={(id) => {
             setEvents((prev) => prev.filter((e) => e.id !== id));
+          }}
+          onCandidateKicked={() => {
+            loadEvents(false);
           }}
         />
       )}

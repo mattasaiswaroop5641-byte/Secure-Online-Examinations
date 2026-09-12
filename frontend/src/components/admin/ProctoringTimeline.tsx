@@ -20,6 +20,7 @@ interface ProctoringTimelineProps {
   events: ProctoringEvent[];
   onEventResolved?: (eventId: number) => void;
   onEventDeleted?: (eventId: number) => void;
+  onCandidateKicked?: () => void;
 }
 
 const eventIconMap: Record<string, any> = {
@@ -37,6 +38,7 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
   events,
   onEventResolved,
   onEventDeleted,
+  onCandidateKicked,
 }) => {
   const [selectedSnapshot, setSelectedSnapshot] = useState<{
     event: ProctoringEvent;
@@ -175,6 +177,10 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
           onDelete={() => {
             handleDelete(selectedSnapshot.event.id);
             setSelectedSnapshot(null);
+          }}
+          onCandidateKicked={() => {
+            setSelectedSnapshot(null);
+            if (onCandidateKicked) onCandidateKicked();
           }}
         />
       )}

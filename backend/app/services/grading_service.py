@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Dict, Any, List
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -103,7 +103,7 @@ async def evaluate_attempt(attempt_id: int, db: AsyncIOMotorDatabase) -> dict:
     total_score = max(0.0, round(total_score, 2))
     total_possible = max(1.0, round(total_possible, 2))
     percentage = round((total_score / total_possible) * 100.0, 2)
-    is_passed = total_score >= float(exam.get("passing_marks", 40.0))
+    is_passed = False if attempt.get("status") == "terminated" else (total_score >= float(exam.get("passing_marks", 40.0)))
 
     # Fetch proctoring incidents
     proc_cursor = db["proctoring_incidents"].find({"attempt_id": attempt_id})
@@ -118,6 +118,9 @@ async def evaluate_attempt(attempt_id: int, db: AsyncIOMotorDatabase) -> dict:
     start_time = attempt.get("start_time") or now
     time_spent = int(max(0, (submitted_at - start_time).total_seconds()))
 
+    curr_status = attempt.get("status")
+    final_status = "terminated" if curr_status == "terminated" else ("submitted" if curr_status == "in_progress" else curr_status or "submitted")
+
     update_fields = {
         "answers": updated_answers,
         "score": total_score,
@@ -126,7 +129,7 @@ async def evaluate_attempt(attempt_id: int, db: AsyncIOMotorDatabase) -> dict:
         "is_passed": is_passed,
         "proctoring_score": proc_summary["score"],
         "violation_count": proc_summary["violations_count"],
-        "status": "submitted" if attempt.get("status") == "in_progress" else attempt.get("status", "submitted"),
+        "status": final_status,
         "submitted_at": submitted_at,
         "time_spent_seconds": time_spent
     }

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { attemptService } from '../../services/attempts';
 import { formatDate } from '../../utils/formatters';
+import { LiveStreamControls } from '../../components/admin/LiveStreamControls';
+import { KickCandidateModal } from '../../components/admin/KickCandidateModal';
+import { LiveCandidateWatchModal } from '../../components/admin/LiveCandidateWatchModal';
 import {
   Users,
   Search,
@@ -10,10 +13,10 @@ import {
   ShieldCheck,
   ShieldAlert,
   ArrowRight,
-  RefreshCw,
-  Radio,
-  Activity,
   Clock,
+  UserX,
+  AlertTriangle,
+  Eye,
 } from 'lucide-react';
 
 interface AttemptReviewPageProps {
@@ -27,13 +30,25 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLive, setIsLive] = useState(true);
+  const [intervalSeconds, setIntervalSeconds] = useState<number>(3);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
+  const [selectedKickAttempt, setSelectedKickAttempt] = useState<{
+    id: number;
+    name?: string;
+    exam?: string;
+  } | null>(null);
+  const [selectedLiveWatchAttempt, setSelectedLiveWatchAttempt] = useState<{
+    id: number;
+    name?: string;
+  } | null>(null);
 
   const loadAttempts = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsSyncing(true);
     try {
       const data = await attemptService.listAttemptsAdmin();
       setAttempts(data);
+      setLastSyncTime(new Date());
     } catch (err) {
       console.error('Failed to load attempts:', err);
     } finally {
@@ -46,15 +61,15 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
     loadAttempts(false);
   }, [loadAttempts]);
 
-  // Live Auto-Refresh Polling (every 3.5s)
+  // Live Auto-Refresh Polling with configurable cadence
   useEffect(() => {
     if (!isLive) return;
     const intervalId = setInterval(() => {
       loadAttempts(true);
-    }, 3500);
+    }, intervalSeconds * 1000);
 
     return () => clearInterval(intervalId);
-  }, [isLive, loadAttempts]);
+  }, [isLive, intervalSeconds, loadAttempts]);
 
   const filtered = attempts.filter(
     (a) =>
@@ -77,49 +92,23 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Live Stream Switch Badge */}
-          <button
-            onClick={() => setIsLive((prev) => !prev)}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              isLive
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <span className="relative flex h-2 w-2">
-              {isLive && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              )}
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  isLive ? 'bg-emerald-500' : 'bg-slate-500'
-                }`}
-              />
-            </span>
-            <span>{isLive ? 'Live Submissions (3.5s)' : 'Live Polling Paused'}</span>
-          </button>
-
-          <button
-            onClick={() => loadAttempts(false)}
-            disabled={isSyncing}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-            title="Manual Sync"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-cyan-400' : ''}`} />
-            <span>Sync</span>
-          </button>
-
-          {inProgressCount > 0 && (
-            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-semibold animate-pulse">
-              {inProgressCount} Candidate(s) Live Now
-            </span>
-          )}
-
           <span className="text-xs font-mono text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
             {attempts.length} Total Submissions
           </span>
         </div>
       </div>
+
+      {/* Live Stream Controls Bar */}
+      <LiveStreamControls
+        isLive={isLive}
+        onToggleLive={() => setIsLive((prev) => !prev)}
+        intervalSeconds={intervalSeconds}
+        onChangeInterval={(sec) => setIntervalSeconds(sec)}
+        onManualSync={() => loadAttempts(false)}
+        isSyncing={isSyncing}
+        lastSyncTime={lastSyncTime}
+        activeCount={inProgressCount}
+      />
 
       {/* Search Input */}
       <div className="relative max-w-md">
@@ -164,6 +153,7 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
               ) : (
                 filtered.map((att) => {
                   const isInProgress = att.status === 'in_progress';
+                  const isTerminated = att.status === 'terminated';
 
                   return (
                     <tr key={att.id} className="hover:bg-slate-800/30 transition-colors">
@@ -195,6 +185,18 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                             </span>
                             <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Session Active</p>
                           </div>
+                        ) : isTerminated ? (
+                          <div>
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              <ShieldAlert className="w-3 h-3" />
+                              <span>Terminated</span>
+                            </span>
+                            {att.termination_reason && (
+                              <p className="text-[10px] text-rose-400/80 mt-0.5 truncate max-w-[150px]" title={att.termination_reason}>
+                                {att.termination_reason}
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <div>
                             <span className="font-mono font-bold text-white text-sm">{att.score}</span>
@@ -209,6 +211,11 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                             <Clock className="w-3 h-3" />
                             <span>In Progress</span>
+                          </span>
+                        ) : isTerminated ? (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-600/20 text-rose-300 border border-rose-500/40">
+                            <XCircle className="w-3 h-3 text-rose-400" />
+                            <span>Disqualified</span>
                           </span>
                         ) : att.is_passed ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -246,13 +253,35 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                       </td>
 
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => onViewAttemptResult(att.id)}
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
-                        >
-                          <span>{isInProgress ? 'Live Monitor' : 'Review Result'}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          {isInProgress && (
+                            <>
+                              <button
+                                onClick={() => setSelectedLiveWatchAttempt({ id: att.id, name: att.student_name })}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-indigo-600/15 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                title="Silent Live Candidate Video Stream"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Watch</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedKickAttempt({ id: att.id, name: att.student_name, exam: att.exam_title })}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                title="Kick Candidate & Disqualify Exam"
+                              >
+                                <UserX className="w-3.5 h-3.5" />
+                                <span>Kick</span>
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => onViewAttemptResult(att.id)}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                          >
+                            <span>{isInProgress ? 'Live Monitor' : 'Review Result'}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -262,6 +291,35 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Silent Live Candidate Watch Modal */}
+      {selectedLiveWatchAttempt && (
+        <LiveCandidateWatchModal
+          isOpen={Boolean(selectedLiveWatchAttempt)}
+          onClose={() => setSelectedLiveWatchAttempt(null)}
+          attemptId={selectedLiveWatchAttempt.id}
+          candidateName={selectedLiveWatchAttempt.name}
+          onCandidateKicked={() => {
+            setSelectedLiveWatchAttempt(null);
+            loadAttempts(false);
+          }}
+        />
+      )}
+
+      {/* Kick Modal */}
+      {selectedKickAttempt && (
+        <KickCandidateModal
+          isOpen={Boolean(selectedKickAttempt)}
+          onClose={() => setSelectedKickAttempt(null)}
+          attemptId={selectedKickAttempt.id}
+          candidateName={selectedKickAttempt.name}
+          examTitle={selectedKickAttempt.exam}
+          onSuccess={() => {
+            setSelectedKickAttempt(null);
+            loadAttempts(false);
+          }}
+        />
+      )}
     </div>
   );
 };

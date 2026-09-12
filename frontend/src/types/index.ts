@@ -83,7 +83,7 @@ export interface Exam {
   status: 'draft' | 'scheduled' | 'active' | 'completed' | 'archived';
   question_count?: number;
   attempt_count?: number;
-  user_attempt_status?: 'in_progress' | 'submitted' | 'timed_out' | null;
+  user_attempt_status?: 'in_progress' | 'submitted' | 'timed_out' | 'terminated' | null;
   user_attempt_id?: number | null;
 }
 
@@ -146,6 +146,9 @@ export interface AttemptResult {
   proctoring_score: number;
   violation_count: number;
   proctoring_status: 'Normal' | 'Warning' | 'Suspicious';
+  termination_reason?: string | null;
+  terminated_by_name?: string | null;
+  terminated_at?: string | null;
   questions?: QuestionAnalysisItem[];
 }
 
@@ -157,7 +160,8 @@ export type ProctoringEventType =
   | 'TAB_SWITCH'
   | 'FULLSCREEN_EXIT'
   | 'CAMERA_DISCONNECTED'
-  | 'DEVTOOLS_SUSPECT';
+  | 'DEVTOOLS_SUSPECT'
+  | 'PROCTOR_TERMINATED';
 
 export type ViolationSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 

@@ -98,6 +98,50 @@ export const ResultPage: React.FC<ResultPageProps> = ({ attemptId, onBackToDashb
         </div>
       </div>
 
+      {/* KICKED / TERMINATED PROCTOR NOTICE BANNER */}
+      {(result.status === 'terminated' || result.termination_reason) && (
+        <div className="p-6 bg-gradient-to-r from-rose-950/80 via-rose-900/60 to-slate-900 border-2 border-rose-500/60 rounded-3xl shadow-2xl space-y-3 animate-in slide-in-from-top-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-500 text-white shadow-sm">
+                  Disqualified & Terminated
+                </span>
+                <span className="text-xs text-rose-300 font-semibold">
+                  Integrity Rule Violation
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-white mt-0.5">
+                Examination Terminated by Proctor
+              </h2>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/70 border border-rose-500/20 p-4 rounded-2xl space-y-2">
+            <div className="text-xs font-semibold text-rose-300 uppercase tracking-wider">
+              Reason for Disqualification:
+            </div>
+            <p className="text-sm text-slate-200 font-medium leading-relaxed">
+              {result.termination_reason || 'Proctor disqualified this candidate session due to security/integrity protocol violations.'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 pt-1">
+            <span>
+              Authorized by: <strong className="text-slate-200">{result.terminated_by_name || 'System / Administrator'}</strong>
+            </span>
+            {result.terminated_at && (
+              <span>
+                Terminated on: <strong className="text-slate-200">{formatDate(result.terminated_at)}</strong>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main KPI Scoreboard Banner */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Score & Percentage */}
@@ -106,12 +150,18 @@ export const ResultPage: React.FC<ResultPageProps> = ({ attemptId, onBackToDashb
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Score</span>
             <span
               className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                result.is_passed
+                result.status === 'terminated'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : result.is_passed
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                   : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
               }`}
             >
-              {result.is_passed ? 'Passed Examination' : 'Below Passing Threshold'}
+              {result.status === 'terminated'
+                ? 'Disqualified (Terminated)'
+                : result.is_passed
+                ? 'Passed Examination'
+                : 'Below Passing Threshold'}
             </span>
           </div>
 
