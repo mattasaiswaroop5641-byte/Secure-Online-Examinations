@@ -202,6 +202,13 @@ examshield/
 
 ---
 
+## 👥 Contributors
+
+- **Sai Swaroop Matta** ([@mattasaiswaroop5641-byte](https://github.com/mattasaiswaroop5641-byte))
+- **Karthik** ([@Karthik6-cpu](https://github.com/Karthik6-cpu))
+
+---
+
 ## 📄 License
 
 MIT License — Built for academic competitions, hackathons, and real-world institutional evaluations.
