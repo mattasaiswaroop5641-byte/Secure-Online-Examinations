@@ -5,8 +5,6 @@ A professional, production-style Secure Online Examination System with Continuou
 
 ExamShield runs **100% locally with open-source Computer Vision**. It does not require any paid APIs, external AI keys, or third-party cloud services.
 
----
-
 ## 🌟 Key Features
 
 ### 1. Role-Based Portals & Workflows
