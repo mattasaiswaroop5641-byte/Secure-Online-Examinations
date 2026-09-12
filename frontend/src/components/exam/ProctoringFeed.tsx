@@ -20,9 +20,9 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
   const isSuspicious = detection.status !== 'NORMAL';
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
       {/* Top Banner */}
-      <div className="px-3.5 py-2.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-xs">
+      <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2">
           <span className="relative flex h-2 w-2">
             <span
@@ -36,21 +36,21 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
               }`}
             />
           </span>
-          <span className="font-semibold text-slate-200 text-[11px] tracking-wide uppercase">
+          <span className="font-semibold text-slate-800 text-[11px] tracking-wide uppercase">
             Continuous Proctor
           </span>
         </div>
 
         {/* Live Integrity Trust Meter */}
         <div className="flex items-center space-x-1.5">
-          <span className="text-[10px] text-slate-400">Trust:</span>
+          <span className="text-[10px] text-slate-500">Trust:</span>
           <span
             className={`font-mono font-bold text-xs ${
               trustScore >= 85
-                ? 'text-emerald-400'
+                ? 'text-emerald-600'
                 : trustScore >= 65
-                ? 'text-amber-400'
-                : 'text-rose-400'
+                ? 'text-amber-600'
+                : 'text-rose-600'
             }`}
           >
             {trustScore}%
@@ -59,7 +59,7 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
       </div>
 
       {/* Video Container */}
-      <div className="relative aspect-video bg-slate-950 overflow-hidden">
+      <div className="relative aspect-video bg-slate-900 overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
@@ -71,16 +71,15 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
           className="w-full h-full object-cover transform -scale-x-100"
         />
 
-
         {/* Subtle Scanning Radar Beam */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-cyan-500/10 to-transparent h-12 w-full animate-scan" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-blue-500/10 to-transparent h-12 w-full animate-scan" />
 
         {/* Target Bounding Box Guide */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
             className={`w-32 h-40 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center justify-center p-2 text-center ${
               detection.status === 'NORMAL'
-                ? 'border-emerald-500/70 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
+                ? 'border-emerald-400/80 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
                 : detection.status === 'MULTIPLE_FACES'
                 ? 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)] bg-rose-950/20 animate-pulse'
                 : detection.status === 'NO_FACE'
@@ -160,8 +159,8 @@ export const ProctoringFeed: React.FC<ProctoringFeedProps> = ({
 
       {/* Warning Notice Ribbon if warning active */}
       {warningMessage && (
-        <div className="p-2 bg-rose-500/15 border-t border-rose-500/30 text-rose-300 text-[11px] font-medium flex items-center space-x-1.5 animate-pulse">
-          <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+        <div className="p-2 bg-rose-50 border-t border-rose-200 text-rose-700 text-[11px] font-medium flex items-center space-x-1.5 animate-pulse">
+          <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
           <span className="leading-tight">{warningMessage}</span>
         </div>
       )}

@@ -95,12 +95,12 @@ export const ProctoringReportsPage: React.FC = () => {
   });
 
   return (
-    <div className="p-6 sm:p-8 space-y-6">
+    <div className="p-6 sm:p-8 space-y-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white tracking-tight">Proctoring Incident Center</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Proctoring Incident Center</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
             Continuous webcam audit records, computer vision forensic alerts, and live evidence review.
           </p>
         </div>
@@ -110,14 +110,14 @@ export const ProctoringReportsPage: React.FC = () => {
             <button
               onClick={handleClearAll}
               disabled={isClearing}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>{isClearing ? 'Clearing...' : 'Clear All Incidents'}</span>
             </button>
           )}
 
-          <span className="text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl font-semibold">
+          <span className="text-xs font-mono text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl font-semibold">
             {events.length} Total Incident(s)
           </span>
         </div>
@@ -135,24 +135,24 @@ export const ProctoringReportsPage: React.FC = () => {
       />
 
       {/* Filter Toolbar */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="p-4 bg-white border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
         <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search incidents by event type, candidate, or keyword..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+            className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
         <div className="flex items-center space-x-2">
-          <Filter className="w-4 h-4 text-slate-500" />
+          <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={selectedSeverity}
             onChange={(e) => setSelectedSeverity(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none cursor-pointer"
+            className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-600 cursor-pointer"
           >
             <option value="">All Severities</option>
             <option value="CRITICAL">Critical</option>
@@ -167,7 +167,7 @@ export const ProctoringReportsPage: React.FC = () => {
       {isLoading && events.length === 0 ? (
         <div className="space-y-3">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="h-24 bg-slate-900 rounded-2xl animate-pulse" />
+            <div key={n} className="h-24 bg-white border border-slate-200 rounded-2xl shadow-sm animate-pulse" />
           ))}
         </div>
       ) : (

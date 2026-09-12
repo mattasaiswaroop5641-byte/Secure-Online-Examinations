@@ -81,18 +81,18 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
   const inProgressCount = attempts.filter((a) => a.status === 'in_progress').length;
 
   return (
-    <div className="p-6 sm:p-8 space-y-6">
+    <div className="p-6 sm:p-8 space-y-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white tracking-tight">Candidate Attempts & Results</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Candidate Attempts & Results</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
             Audit candidate submission records, scores, pass/fail status, and live proctoring telemetry.
           </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          <span className="text-xs font-mono text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+          <span className="text-xs font-mono text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm">
             {attempts.length} Total Submissions
           </span>
         </div>
@@ -112,21 +112,21 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
 
       {/* Search Input */}
       <div className="relative max-w-md">
-        <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by candidate name, student ID, or exam..."
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+          className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm"
         />
       </div>
 
       {/* Attempts Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+            <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200">
               <tr>
                 <th className="p-4">Candidate</th>
                 <th className="p-4">Examination</th>
@@ -137,7 +137,7 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/80">
+            <tbody className="divide-y divide-slate-100">
               {isLoading && attempts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500">
@@ -156,15 +156,15 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                   const isTerminated = att.status === 'terminated';
 
                   return (
-                    <tr key={att.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={att.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center space-x-2">
                           {isInProgress && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
                           )}
                           <div>
-                            <p className="font-semibold text-white">{att.student_name}</p>
-                            <p className="text-[11px] text-slate-400 font-mono">
+                            <p className="font-semibold text-slate-900">{att.student_name}</p>
+                            <p className="text-[11px] text-slate-500 font-mono">
                               {att.student_code || att.student_email}
                             </p>
                           </div>
@@ -172,58 +172,58 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                       </td>
 
                       <td className="p-4">
-                        <p className="font-semibold text-slate-200">{att.exam_title}</p>
+                        <p className="font-semibold text-slate-800">{att.exam_title}</p>
                         <p className="text-[10px] text-slate-500">{formatDate(att.start_time)}</p>
                       </td>
 
                       <td className="p-4">
                         {isInProgress ? (
                           <div>
-                            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                               <span>Writing Exam</span>
                             </span>
                             <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Session Active</p>
                           </div>
                         ) : isTerminated ? (
                           <div>
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
                               <ShieldAlert className="w-3 h-3" />
                               <span>Terminated</span>
                             </span>
                             {att.termination_reason && (
-                              <p className="text-[10px] text-rose-400/80 mt-0.5 truncate max-w-[150px]" title={att.termination_reason}>
+                              <p className="text-[10px] text-rose-600 mt-0.5 truncate max-w-[150px]" title={att.termination_reason}>
                                 {att.termination_reason}
                               </p>
                             )}
                           </div>
                         ) : (
                           <div>
-                            <span className="font-mono font-bold text-white text-sm">{att.score}</span>
+                            <span className="font-mono font-bold text-slate-900 text-sm">{att.score}</span>
                             <span className="text-slate-500 text-xs"> / {att.total_possible_marks}</span>
-                            <p className="text-[10px] text-indigo-400 font-semibold">{att.percentage}%</p>
+                            <p className="text-[10px] text-blue-600 font-semibold">{att.percentage}%</p>
                           </div>
                         )}
                       </td>
 
                       <td className="p-4">
                         {isInProgress ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
                             <Clock className="w-3 h-3" />
                             <span>In Progress</span>
                           </span>
                         ) : isTerminated ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-600/20 text-rose-300 border border-rose-500/40">
-                            <XCircle className="w-3 h-3 text-rose-400" />
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+                            <XCircle className="w-3 h-3 text-rose-500" />
                             <span>Disqualified</span>
                           </span>
                         ) : att.is_passed ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3" />
                             <span>Passed</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
                             <XCircle className="w-3 h-3" />
                             <span>Failed</span>
                           </span>
@@ -234,21 +234,21 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold border ${
                             att.proctoring_score >= 85
-                              ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                               : att.proctoring_score >= 65
-                              ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                              : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                              ? 'text-amber-700 bg-amber-50 border-amber-200'
+                              : 'text-rose-700 bg-rose-50 border-rose-200'
                           }`}
                         >
                           {att.proctoring_score}%
                         </span>
                       </td>
 
-                      <td className="p-4 font-mono text-slate-300">
+                      <td className="p-4 font-mono text-slate-700">
                         {att.violation_count > 0 ? (
-                          <span className="text-rose-400 font-bold">{att.violation_count} Incident(s)</span>
+                          <span className="text-rose-600 font-bold">{att.violation_count} Incident(s)</span>
                         ) : (
-                          <span className="text-emerald-400">0</span>
+                          <span className="text-emerald-600">0</span>
                         )}
                       </td>
 
@@ -258,7 +258,7 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                             <>
                               <button
                                 onClick={() => setSelectedLiveWatchAttempt({ id: att.id, name: att.student_name })}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-indigo-600/15 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
                                 title="Silent Live Candidate Video Stream"
                               >
                                 <Eye className="w-3.5 h-3.5" />
@@ -266,7 +266,7 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                               </button>
                               <button
                                 onClick={() => setSelectedKickAttempt({ id: att.id, name: att.student_name, exam: att.exam_title })}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
                                 title="Kick Candidate & Disqualify Exam"
                               >
                                 <UserX className="w-3.5 h-3.5" />
@@ -276,7 +276,7 @@ export const AttemptReviewPage: React.FC<AttemptReviewPageProps> = ({
                           )}
                           <button
                             onClick={() => onViewAttemptResult(att.id)}
-                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
                           >
                             <span>{isInProgress ? 'Live Monitor' : 'Review Result'}</span>
                             <ArrowRight className="w-3.5 h-3.5" />

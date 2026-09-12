@@ -66,18 +66,18 @@ export const ExamTimer: React.FC<ExamTimerProps> = ({ initialSeconds, attemptId,
 
   return (
     <div
-      className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-sm tracking-wider transition-all ${
+      className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-sm tracking-wider transition-all shadow-sm ${
         isCritical
-          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse shadow-lg shadow-rose-500/20'
+          ? 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
           : isWarning
-          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-          : 'bg-slate-950/80 text-emerald-400 border-emerald-500/30'
+          ? 'bg-amber-50 text-amber-800 border-amber-300'
+          : 'bg-blue-50 text-blue-700 border-blue-200'
       }`}
     >
       {isCritical ? (
-        <AlertTriangle className="w-4 h-4 text-rose-400 animate-bounce" />
+        <AlertTriangle className="w-4 h-4 text-rose-600 animate-bounce" />
       ) : (
-        <Clock className="w-4 h-4" />
+        <Clock className="w-4 h-4 text-blue-600" />
       )}
       <span>{formatSeconds(secondsLeft)}</span>
     </div>

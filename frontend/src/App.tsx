@@ -110,33 +110,33 @@ const AppContent: React.FC = () => {
         return (
           <div className="p-6 sm:p-8 space-y-6 max-w-3xl">
             <div>
-              <h2 className="text-2xl font-extrabold text-white tracking-tight">Security & System Configuration</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Security & System Configuration</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Manage Two-Factor Authentication (Google Authenticator) and proctoring thresholds.
               </p>
             </div>
 
             {/* 2FA Security Card */}
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
+            <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className={`p-3 rounded-2xl ${user?.is_2fa_enabled ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'}`}>
+                  <div className={`p-3 rounded-2xl ${user?.is_2fa_enabled ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' : 'bg-amber-50 border border-amber-200 text-amber-600'}`}>
                     <Smartphone className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                    <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                       <span>Two-Factor Authentication (2FA)</span>
                       {user?.is_2fa_enabled ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           Active 🔒
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                           Not Enabled
                         </span>
                       )}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Protect your admin account with Google Authenticator / TOTP time-based one-time codes.
                     </p>
                   </div>
@@ -144,31 +144,31 @@ const AppContent: React.FC = () => {
               </div>
 
               {disable2FAError && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{disable2FAError}</span>
                 </div>
               )}
 
               <div className="pt-2">
                 {!user?.is_2fa_enabled ? (
-                  <div className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800/80">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="space-y-1">
-                      <p className="text-xs font-semibold text-slate-200">Google Authenticator Setup</p>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-xs font-semibold text-slate-800">Google Authenticator Setup</p>
+                      <p className="text-[11px] text-slate-500">
                         Scan the setup QR code to require a 6-digit code on every admin login.
                       </p>
                     </div>
                     <button
                       onClick={() => setIs2FAModalOpen(true)}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer shrink-0"
                     >
                       Setup 2FA
                     </button>
                   </div>
                 ) : (
-                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800/80 space-y-3">
-                    <div className="flex items-center space-x-2 text-emerald-400 text-xs font-semibold">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                    <div className="flex items-center space-x-2 text-emerald-600 text-xs font-semibold">
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Google Authenticator is actively securing your login.</span>
                     </div>
@@ -180,12 +180,12 @@ const AppContent: React.FC = () => {
                         value={disable2FACode}
                         onChange={(e) => setDisable2FACode(e.target.value.replace(/\D/g, ''))}
                         placeholder="Enter 6-digit code to disable"
-                        className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-rose-500"
+                        className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-rose-500"
                       />
                       <button
                         type="submit"
                         disabled={isDisabling2FA || disable2FACode.length < 6}
-                        className="px-3.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 font-semibold text-xs rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                        className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 font-semibold text-xs rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
                       >
                         {isDisabling2FA ? 'Disabling...' : 'Disable 2FA'}
                       </button>
@@ -197,16 +197,16 @@ const AppContent: React.FC = () => {
 
             {/* Proctoring Thresholds Card */}
             {settingsSavedNotice && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300 text-xs flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Threshold settings updated successfully.</span>
               </div>
             )}
 
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-5">
-              <h3 className="text-sm font-bold text-white">Proctoring Calibration & Sensitivity</h3>
+            <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-5 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900">Proctoring Calibration & Sensitivity</h3>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Absence / No-Face Grace Period (Seconds)
                 </label>
                 <input
@@ -215,7 +215,7 @@ const AppContent: React.FC = () => {
                   max={15}
                   value={gracePeriod}
                   onChange={(e) => setGracePeriod(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-mono focus:outline-none focus:border-blue-600"
                 />
                 <span className="text-[11px] text-slate-500 mt-1 block">
                   Candidate absence under this threshold is treated as natural momentary movement.
@@ -223,7 +223,7 @@ const AppContent: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Incident Violation Duration Trigger (Seconds)
                 </label>
                 <input
@@ -232,35 +232,35 @@ const AppContent: React.FC = () => {
                   max={30}
                   value={warningThreshold}
                   onChange={(e) => setWarningThreshold(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-mono focus:outline-none focus:border-blue-600"
                 />
                 <span className="text-[11px] text-slate-500 mt-1 block">
                   Duration beyond which absence or attention shift logs a formal high-severity incident.
                 </span>
               </div>
 
-              <label className="flex items-center space-x-3 p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 cursor-pointer">
+              <label className="flex items-center space-x-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={snapshotCaptureEnabled}
                   onChange={(e) => setSnapshotCaptureEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-700 bg-slate-900"
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 bg-white"
                 />
                 <div>
-                  <p className="text-xs font-semibold text-slate-200">Capture Forensic Snapshot on High Severity</p>
+                  <p className="text-xs font-semibold text-slate-800">Capture Forensic Snapshot on High Severity</p>
                   <p className="text-[11px] text-slate-500">
                     Automatically stores annotated webcam frames when multiple faces or prolonged absence occurs.
                   </p>
                 </div>
               </label>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end">
+              <div className="pt-3 border-t border-slate-200 flex justify-end">
                 <button
                   onClick={() => {
                     setSettingsSavedNotice(true);
                     setTimeout(() => setSettingsSavedNotice(false), 3000);
                   }}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer"
                 >
                   Save Configuration
                 </button>
@@ -269,20 +269,20 @@ const AppContent: React.FC = () => {
 
             {/* Database Maintenance & Drop DB Card (Admin Only) */}
             {user?.role === 'admin' && (
-              <div className="p-6 bg-slate-900 border-2 border-rose-500/30 rounded-3xl space-y-4">
+              <div className="p-6 bg-white border-2 border-rose-200 rounded-3xl space-y-4 shadow-sm">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                    <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600">
                       <Database className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                      <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                         <span>Database Maintenance & Drop Operations</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase">
                           Admin Only
                         </span>
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         Purge test attempts, reset to baseline seed data, or perform database collection drops.
                       </p>
                     </div>
@@ -290,7 +290,7 @@ const AppContent: React.FC = () => {
 
                   <button
                     onClick={() => setIsDbModalOpen(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-rose-600/20 transition-all cursor-pointer shrink-0"
+                    className="flex items-center space-x-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />
                     <span>Drop / Reset DB</span>
@@ -326,7 +326,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       <Navbar
         currentView={currentView}
         onNavigate={(view) => {
@@ -407,7 +407,7 @@ const AppContent: React.FC = () => {
               currentTab={adminTab}
               onSelectTab={(tab) => setAdminTab(tab)}
             />
-            <div className="flex-1 overflow-y-auto bg-slate-950">
+            <div className="flex-1 overflow-y-auto bg-slate-50">
               {renderAdminTabContent()}
             </div>
           </div>
@@ -436,12 +436,12 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-14 h-14 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center justify-center text-rose-400 mb-4">
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-14 h-14 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-center text-rose-600 mb-4">
             <ShieldAlert className="w-8 h-8" />
           </div>
-          <h1 className="text-xl font-bold mb-2">Something went wrong</h1>
-          <p className="text-xs text-slate-400 max-w-sm mb-6 font-mono">
+          <h1 className="text-xl font-bold mb-2 text-slate-900">Something went wrong</h1>
+          <p className="text-xs text-slate-600 max-w-sm mb-6 font-mono">
             {this.state.error?.message || "An unexpected error occurred while loading the application."}
           </p>
           <button
@@ -449,7 +449,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
               localStorage.clear();
               window.location.reload();
             }}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl cursor-pointer"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl cursor-pointer"
           >
             Reload ExamShield
           </button>

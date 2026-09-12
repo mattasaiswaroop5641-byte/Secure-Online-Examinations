@@ -68,10 +68,10 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
 
   if (events.length === 0) {
     return (
-      <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800">
-        <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-        <p className="text-sm font-semibold text-slate-200">No Proctoring Violations Recorded</p>
-        <p className="text-xs text-slate-400 mt-1">This examination session maintained high integrity standards.</p>
+      <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+        <p className="text-sm font-semibold text-slate-900">No Proctoring Violations Recorded</p>
+        <p className="text-xs text-slate-500 mt-1">This examination session maintained high integrity standards.</p>
       </div>
     );
   }
@@ -85,16 +85,16 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
         return (
           <div
             key={ev.id}
-            className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-slate-700/80 transition-colors"
+            className="p-4 bg-white border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-slate-300 shadow-sm transition-colors"
           >
             <div className="flex items-start space-x-3.5 flex-1">
               <div
                 className={`p-2.5 rounded-xl mt-0.5 shrink-0 ${
                   ev.severity === 'CRITICAL'
-                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    ? 'bg-rose-50 text-rose-600 border border-rose-200'
                     : ev.severity === 'HIGH'
-                    ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                    : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                    ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                    : 'bg-blue-50 text-blue-600 border border-blue-200'
                 }`}
               >
                 <Icon className="w-5 h-5" />
@@ -102,24 +102,24 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
 
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-mono text-slate-400">{formatDate(ev.timestamp)}</span>
+                  <span className="text-xs font-mono text-slate-500">{formatDate(ev.timestamp)}</span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${severityClass}`}
                   >
                     {ev.severity}
                   </span>
-                  <span className="text-xs font-bold text-slate-200">{ev.event_type}</span>
+                  <span className="text-xs font-bold text-slate-900">{ev.event_type}</span>
                   {ev.student_name && (
-                    <span className="text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">
+                    <span className="text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
                       Candidate: {ev.student_name}
                     </span>
                   )}
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">{ev.description}</p>
+                <p className="text-xs text-slate-600 leading-relaxed">{ev.description}</p>
 
                 {ev.duration_seconds > 0 && (
-                  <p className="text-[11px] text-slate-500 font-mono">
+                  <p className="text-[11px] text-slate-400 font-mono">
                     Incident Duration: {ev.duration_seconds}s
                   </p>
                 )}
@@ -131,7 +131,7 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
               {ev.screenshot_path && (
                 <button
                   onClick={() => setSelectedSnapshot({ event: ev })}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Image className="w-3.5 h-3.5" />
                   <span>View Evidence</span>
@@ -139,14 +139,14 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
               )}
 
               {ev.resolved ? (
-                <span className="flex items-center space-x-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20 font-semibold">
+                <span className="flex items-center space-x-1 text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 font-semibold">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Reviewed</span>
                 </span>
               ) : (
                 <button
                   onClick={() => handleResolve(ev.id)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-300 hover:border-emerald-500/30 text-slate-400 border border-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Mark Resolved
                 </button>
@@ -155,7 +155,7 @@ export const ProctoringTimeline: React.FC<ProctoringTimelineProps> = ({
               <button
                 onClick={() => handleDelete(ev.id)}
                 title="Delete this incident"
-                className="p-1.5 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 text-slate-400 border border-slate-700 rounded-xl text-xs transition-colors cursor-pointer"
+                className="p-1.5 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-400 border border-slate-200 rounded-xl text-xs transition-colors cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

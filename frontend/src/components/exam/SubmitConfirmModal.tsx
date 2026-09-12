@@ -34,38 +34,38 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
       <div className="space-y-5">
         {/* Statistics breakdown */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
-            <div className="flex items-center justify-center text-emerald-400 mb-1">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+            <div className="flex items-center justify-center text-emerald-600 mb-1">
               <CheckCircle2 className="w-4 h-4" />
             </div>
-            <p className="text-xl font-bold text-emerald-300">{answeredCount}</p>
-            <p className="text-[11px] text-emerald-400/80 font-medium">Answered</p>
+            <p className="text-xl font-bold text-emerald-700">{answeredCount}</p>
+            <p className="text-[11px] text-emerald-600 font-medium">Answered</p>
           </div>
 
-          <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-center">
-            <div className="flex items-center justify-center text-purple-400 mb-1">
+          <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-center">
+            <div className="flex items-center justify-center text-purple-600 mb-1">
               <Bookmark className="w-4 h-4" />
             </div>
-            <p className="text-xl font-bold text-purple-300">{markedCount}</p>
-            <p className="text-[11px] text-purple-400/80 font-medium">Marked</p>
+            <p className="text-xl font-bold text-purple-700">{markedCount}</p>
+            <p className="text-[11px] text-purple-600 font-medium">Marked</p>
           </div>
 
-          <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-center">
-            <div className="flex items-center justify-center text-slate-400 mb-1">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <div className="flex items-center justify-center text-slate-500 mb-1">
               <HelpCircle className="w-4 h-4" />
             </div>
-            <p className="text-xl font-bold text-slate-300">{unansweredCount}</p>
-            <p className="text-[11px] text-slate-400 font-medium">Unanswered</p>
+            <p className="text-xl font-bold text-slate-800">{unansweredCount}</p>
+            <p className="text-[11px] text-slate-500 font-medium">Unanswered</p>
           </div>
         </div>
 
         {/* Warning if unanswered */}
         {unansweredCount > 0 && (
-          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start space-x-2.5 text-xs text-amber-300">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-2.5 text-xs text-amber-800">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold">You have {unansweredCount} unanswered questions!</span>
-              <p className="mt-0.5 text-amber-400/80">
+              <p className="mt-0.5 text-amber-700">
                 Are you sure you want to finish now? Any unanswered questions will receive 0 points.
               </p>
             </div>
@@ -77,7 +77,7 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
           <button
             disabled={isSubmitting}
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
           >
             Return to Exam
           </button>
@@ -85,7 +85,7 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
           <button
             disabled={isSubmitting}
             onClick={onConfirm}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/20 transition-all flex items-center space-x-2"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-600/20 transition-all flex items-center space-x-2 cursor-pointer"
           >
             {isSubmitting ? (
               <span>Submitting & Evaluating...</span>

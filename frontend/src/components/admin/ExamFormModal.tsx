@@ -141,89 +141,89 @@ export const ExamFormModal: React.FC<ExamFormModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {errorMessage && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
             {errorMessage}
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Exam Title *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Exam Title *</label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Advanced Operating Systems Midterm"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-600 placeholder:text-slate-400 shadow-sm"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Subject / Department *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Subject / Department *</label>
             <input
               type="text"
               required
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g. Computer Science"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-600 placeholder:text-slate-400 shadow-sm"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">Description</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Description</label>
           <textarea
             rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief overview of examination topics and scope..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+            className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-600 placeholder:text-slate-400 shadow-sm"
           />
         </div>
 
         {/* Configurations Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs">
           <div>
-            <label className="block font-medium text-slate-400 mb-1">Duration (Mins)</label>
+            <label className="block font-medium text-slate-600 mb-1">Duration (Mins)</label>
             <input
               type="number"
               min={1}
               value={durationMinutes}
               onChange={(e) => setDurationMinutes(Number(e.target.value))}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white font-mono"
+              className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 font-mono shadow-sm"
             />
           </div>
 
           <div>
-            <label className="block font-medium text-slate-400 mb-1">Total Marks</label>
+            <label className="block font-medium text-slate-600 mb-1">Total Marks</label>
             <input
               type="number"
               min={1}
               value={totalMarks}
               onChange={(e) => setTotalMarks(Number(e.target.value))}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white font-mono"
+              className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 font-mono shadow-sm"
             />
           </div>
 
           <div>
-            <label className="block font-medium text-slate-400 mb-1">Passing Marks</label>
+            <label className="block font-medium text-slate-600 mb-1">Passing Marks</label>
             <input
               type="number"
               min={0}
               value={passingMarks}
               onChange={(e) => setPassingMarks(Number(e.target.value))}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white font-mono"
+              className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 font-mono shadow-sm"
             />
           </div>
 
           <div>
-            <label className="block font-medium text-slate-400 mb-1">Status</label>
+            <label className="block font-medium text-slate-600 mb-1">Status</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as any)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white"
+              className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 shadow-sm"
             >
               <option value="draft">Draft</option>
               <option value="scheduled">Scheduled</option>
@@ -236,41 +236,41 @@ export const ExamFormModal: React.FC<ExamFormModalProps> = ({
 
         {/* Security & Marking Toggles */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label className="flex items-center space-x-2 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer text-xs">
+          <label className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-xs hover:bg-slate-100/60 transition-colors">
             <input
               type="checkbox"
               checked={negativeMarking}
               onChange={(e) => setNegativeMarking(e.target.checked)}
-              className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700"
+              className="rounded text-blue-600 focus:ring-blue-500 bg-white border-slate-300"
             />
             <div>
-              <p className="font-semibold text-slate-200">Negative Marking</p>
+              <p className="font-semibold text-slate-800">Negative Marking</p>
               <p className="text-[10px] text-slate-500">Deduct penalty on wrong answer</p>
             </div>
           </label>
 
-          <label className="flex items-center space-x-2 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer text-xs">
+          <label className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-xs hover:bg-slate-100/60 transition-colors">
             <input
               type="checkbox"
               checked={randomizeQuestions}
               onChange={(e) => setRandomizeQuestions(e.target.checked)}
-              className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700"
+              className="rounded text-blue-600 focus:ring-blue-500 bg-white border-slate-300"
             />
             <div>
-              <p className="font-semibold text-slate-200">Randomize Questions</p>
+              <p className="font-semibold text-slate-800">Randomize Questions</p>
               <p className="text-[10px] text-slate-500">Scramble order for each candidate</p>
             </div>
           </label>
 
-          <label className="flex items-center space-x-2 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer text-xs">
+          <label className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer text-xs hover:bg-slate-100/60 transition-colors">
             <input
               type="checkbox"
               checked={randomizeOptions}
               onChange={(e) => setRandomizeOptions(e.target.checked)}
-              className="rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700"
+              className="rounded text-blue-600 focus:ring-blue-500 bg-white border-slate-300"
             />
             <div>
-              <p className="font-semibold text-slate-200">Randomize Options</p>
+              <p className="font-semibold text-slate-800">Randomize Options</p>
               <p className="text-[10px] text-slate-500">Scramble MCQ options A/B/C/D</p>
             </div>
           </label>
@@ -279,7 +279,7 @@ export const ExamFormModal: React.FC<ExamFormModalProps> = ({
         {/* Question Bank Linker */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-semibold text-slate-300">
+            <label className="block text-xs font-semibold text-slate-700">
               Assign Questions ({selectedQuestionIds.length} Selected)
             </label>
             <span className="text-xs text-slate-500">
@@ -287,7 +287,7 @@ export const ExamFormModal: React.FC<ExamFormModalProps> = ({
             </span>
           </div>
 
-          <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-800 divide-y divide-slate-800 bg-slate-950/40">
+          <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 bg-slate-50">
             {allQuestions.length === 0 ? (
               <p className="p-4 text-xs text-slate-500 text-center">No questions available in Question Bank.</p>
             ) : (
@@ -297,22 +297,22 @@ export const ExamFormModal: React.FC<ExamFormModalProps> = ({
                   <div
                     key={q.id}
                     onClick={() => toggleQuestionSelection(q.id)}
-                    className={`p-3 text-xs flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors ${
-                      isSelected ? 'bg-indigo-950/20' : ''
+                    className={`p-3 text-xs flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors ${
+                      isSelected ? 'bg-blue-50/70' : ''
                     }`}
                   >
                     <div className="flex items-center space-x-3 overflow-hidden pr-2">
                       <div
                         className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${
                           isSelected
-                            ? 'bg-indigo-600 border-indigo-500 text-white'
-                            : 'border-slate-700 bg-slate-900'
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : 'border-slate-300 bg-white'
                         }`}
                       >
                         {isSelected && <Check className="w-3 h-3" />}
                       </div>
                       <div className="truncate">
-                        <span className="text-slate-200 font-medium">{q.text}</span>
+                        <span className="text-slate-800 font-medium">{q.text}</span>
                         <span className="text-[10px] text-slate-500 block">
                           {q.subject} • {q.marks} Mark(s) • {q.difficulty}
                         </span>
@@ -326,18 +326,18 @@ export const ExamFormModal: React.FC<ExamFormModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+        <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-sm text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer"
           >
             {isSubmitting ? 'Saving Exam...' : exam ? 'Update Examination' : 'Create Examination'}
           </button>

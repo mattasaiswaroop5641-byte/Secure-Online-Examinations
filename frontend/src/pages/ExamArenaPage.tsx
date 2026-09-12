@@ -257,10 +257,10 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-semibold text-slate-300">Entering Secure Examination Arena...</p>
+          <div className="w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm font-semibold text-slate-800">Entering Secure Examination Arena...</p>
           <p className="text-xs text-slate-500">Initializing continuous face tracker & timer synchronization</p>
         </div>
       </div>
@@ -269,14 +269,14 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
   if (errorMessage || !examData) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-          <AlertCircle className="w-10 h-10 text-rose-400 mx-auto" />
-          <h3 className="text-lg font-bold text-white">Examination Session Error</h3>
-          <p className="text-xs text-slate-400">{errorMessage || 'Could not connect to exam.'}</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-6 text-center space-y-4 shadow-xl">
+          <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
+          <h3 className="text-lg font-bold text-slate-900">Examination Session Error</h3>
+          <p className="text-xs text-slate-500">{errorMessage || 'Could not connect to exam.'}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-md shadow-blue-600/20"
           >
             Retry Connection
           </button>
@@ -291,18 +291,18 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
   const unansweredCount = examData.questions.length - answeredCount;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col secure-exam-content select-none">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col secure-exam-content select-none">
       {/* TOP ARENA BAR */}
-      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-30">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
         {/* Left: Exam Title & Candidate */}
         <div className="flex items-center space-x-3 overflow-hidden">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div className="truncate">
-            <h1 className="text-sm font-bold text-white truncate tracking-tight">{examData.exam_title}</h1>
-            <p className="text-[11px] text-slate-400 truncate">
-              Candidate: <span className="text-slate-200 font-semibold">{user?.name}</span>{' '}
+            <h1 className="text-sm font-bold text-slate-900 truncate tracking-tight">{examData.exam_title}</h1>
+            <p className="text-[11px] text-slate-500 truncate">
+              Candidate: <span className="text-slate-800 font-semibold">{user?.name}</span>{' '}
               {user?.student_id && `(${user.student_id})`}
             </p>
           </div>
@@ -325,7 +325,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
           {!isFullscreen && (
             <button
               onClick={requestFullscreen}
-              className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold animate-pulse transition-colors"
+              className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold animate-pulse transition-colors"
             >
               <Maximize2 className="w-3.5 h-3.5" />
               <span>Re-enter Fullscreen</span>
@@ -338,7 +338,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
           <button
             onClick={() => setIsSubmitModalOpen(true)}
             disabled={Boolean(kickOutNotice)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
           >
             Submit Exam
           </button>
@@ -347,27 +347,27 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
       {/* AUTO-TERMINATION / KICK OUT OVERLAY */}
       {kickOutNotice && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-slate-900 border-2 border-rose-500/60 rounded-3xl p-8 text-center space-y-5 shadow-2xl animate-in zoom-in-95">
-            <div className="w-16 h-16 bg-rose-500/10 border-2 border-rose-500/30 rounded-2xl flex items-center justify-center text-rose-400 mx-auto animate-bounce">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-white border-2 border-rose-400 rounded-3xl p-8 text-center space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-rose-50 border-2 border-rose-200 rounded-2xl flex items-center justify-center text-rose-600 mx-auto animate-bounce">
               <ShieldAlert className="w-10 h-10" />
             </div>
 
             <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                 Examination Terminated
               </h2>
-              <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
                 Security Violation Threshold Exceeded
               </span>
             </div>
 
-            <p className="text-xs text-slate-300 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-left leading-relaxed">
+            <p className="text-xs text-slate-700 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left leading-relaxed">
               {kickOutNotice}
             </p>
 
-            <div className="p-3 bg-rose-500/10 rounded-xl text-[11px] text-rose-300 flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+            <div className="p-3 bg-rose-50 rounded-xl text-[11px] text-rose-700 flex items-center justify-center space-x-2 border border-rose-200">
+              <div className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
               <span>All forensic snapshot frames have been logged to MongoDB Atlas Cloud.</span>
             </div>
 
@@ -382,7 +382,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
       {/* WINDOW BLUR / ALT+TAB WARNING BANNER */}
       {windowBlurWarning && !kickOutNotice && (
-        <div className="bg-amber-500/95 text-slate-950 px-4 py-2 text-xs flex items-center justify-between font-bold sticky top-[57px] z-20 shadow-lg animate-pulse">
+        <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs flex items-center justify-between font-bold sticky top-[57px] z-20 shadow-md animate-pulse">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
             <span>
@@ -394,7 +394,7 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
 
       {/* FULLSCREEN WARNING BANNER */}
       {fullscreenWarning && !kickOutNotice && (
-        <div className="bg-rose-600/90 text-white px-4 py-2 text-xs flex items-center justify-between font-semibold sticky top-[57px] z-20 shadow-md">
+        <div className="bg-rose-600 text-white px-4 py-2 text-xs flex items-center justify-between font-semibold sticky top-[57px] z-20 shadow-md">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 shrink-0 animate-bounce" />
             <span>
@@ -406,13 +406,12 @@ export const ExamArenaPage: React.FC<ExamArenaPageProps> = ({
               dismissFullscreenWarning();
               requestFullscreen();
             }}
-            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors shrink-0 ml-3 cursor-pointer"
+            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors shrink-0 ml-3 cursor-pointer shadow-sm"
           >
             Restore Fullscreen
           </button>
         </div>
       )}
-
 
       {/* MAIN ARENA WORKSPACE */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">

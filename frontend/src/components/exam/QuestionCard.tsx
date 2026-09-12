@@ -33,22 +33,22 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const isMarked = currentAnswer?.is_marked_for_review ?? false;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col h-full shadow-xl">
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col h-full shadow-sm">
       {/* Header Info */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div className="flex items-center space-x-3">
-          <span className="text-sm font-bold text-white bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 px-3 py-1 rounded-xl">
+          <span className="text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-xl">
             Question {currentIndex + 1} of {totalQuestions}
           </span>
-          <span className="text-xs text-slate-400 font-medium">{question.subject}</span>
+          <span className="text-xs text-slate-500 font-medium">{question.subject}</span>
         </div>
 
         <div className="flex items-center space-x-2 text-xs">
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
             +{question.marks} Marks
           </span>
           {question.negative_marks > 0 && (
-            <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">
+            <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-semibold">
               -{question.negative_marks} Neg
             </span>
           )}
@@ -57,7 +57,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
       {/* Question Text */}
       <div className="py-6 flex-1 overflow-y-auto">
-        <div className="text-base sm:text-lg font-medium text-slate-100 leading-relaxed whitespace-pre-wrap select-none">
+        <div className="text-base sm:text-lg font-semibold text-slate-900 leading-relaxed whitespace-pre-wrap select-none">
           {question.text}
         </div>
 
@@ -73,16 +73,16 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 onClick={() => onSelectOption(isSelected ? null : opt.id)}
                 className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center space-x-3 select-none ${
                   isSelected
-                    ? 'bg-indigo-600/15 border-indigo-500 text-white shadow-md shadow-indigo-500/10'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/60 hover:border-slate-700'
+                    ? 'bg-blue-50 border-blue-500 text-blue-900 shadow-sm font-medium'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'
                 }`}
               >
                 {/* Option Letter Badge */}
                 <div
                   className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
                     isSelected
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white text-slate-600 border border-slate-300'
                   }`}
                 >
                   {letter}
@@ -93,7 +93,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
                 {/* Selected Indicator */}
                 {isSelected && (
-                  <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0 animate-in fade-in zoom-in-75" />
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 animate-in fade-in zoom-in-75" />
                 )}
               </div>
             );
@@ -102,12 +102,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       </div>
 
       {/* Footer Navigation Bar */}
-      <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-2">
           {selectedOptionId !== null && (
             <button
               onClick={() => onSelectOption(null)}
-              className="flex items-center space-x-1 px-3 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+              className="flex items-center space-x-1 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Clear Choice</span>
@@ -118,11 +118,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             onClick={onToggleMarkReview}
             className={`flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border transition-colors ${
               isMarked
-                ? 'bg-purple-600/20 text-purple-300 border-purple-500/40'
-                : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800'
+                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
             }`}
           >
-            <Bookmark className={`w-3.5 h-3.5 ${isMarked ? 'fill-purple-400 text-purple-400' : ''}`} />
+            <Bookmark className={`w-3.5 h-3.5 ${isMarked ? 'fill-purple-600 text-purple-600' : ''}`} />
             <span>{isMarked ? 'Marked for Review' : 'Mark for Review'}</span>
           </button>
         </div>
@@ -133,8 +133,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             onClick={onPrevious}
             className={`flex items-center space-x-1.5 px-4 py-2 text-sm font-semibold rounded-xl border transition-all ${
               hasPrevious
-                ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
-                : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'
+                ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 cursor-pointer shadow-sm'
+                : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
             }`}
           >
             <ChevronLeft className="w-4 h-4" />
@@ -143,7 +143,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
           <button
             onClick={onNext}
-            className="flex items-center space-x-1.5 px-5 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+            className="flex items-center space-x-1.5 px-5 py-2 text-sm font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer"
           >
             <span>{hasNext ? 'Save & Next' : 'Review & Submit'}</span>
             <ChevronRight className="w-4 h-4" />

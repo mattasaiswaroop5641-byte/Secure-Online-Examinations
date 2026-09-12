@@ -79,36 +79,36 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
       >
         <div className="space-y-5">
           {/* Stream Status & Info Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-950 rounded-2xl border border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
             <div className="flex items-center space-x-3">
               <div
                 className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
                   isStreamLive
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/20'
-                    : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm'
+                    : 'bg-amber-50 text-amber-700 border-amber-300'
                 }`}
               >
                 <div
                   className={`w-2 h-2 rounded-full ${
-                    isStreamLive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
+                    isStreamLive ? 'bg-emerald-600 animate-ping' : 'bg-amber-500'
                   }`}
                 />
                 <span>{isStreamLive ? 'Live Streaming' : 'Awaiting Frame Signal'}</span>
               </div>
 
               {feedData?.seconds_since_last_frame !== null && (
-                <span className="text-[11px] text-slate-400 font-mono">
+                <span className="text-[11px] text-slate-500 font-mono">
                   Latency: {feedData?.seconds_since_last_frame}s ago
                 </span>
               )}
             </div>
 
             <div className="flex items-center space-x-3 text-xs">
-              <span className="text-slate-400">Stream Cadence:</span>
+              <span className="text-slate-600">Stream Cadence:</span>
               <select
                 value={refreshInterval}
                 onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-xl px-2.5 py-1 focus:outline-none focus:border-indigo-500 font-mono"
+                className="bg-white border border-slate-300 text-slate-800 text-xs rounded-xl px-2.5 py-1 focus:outline-none focus:border-blue-600 font-mono shadow-sm"
               >
                 <option value={1000}>1.0s (Ultra Fast)</option>
                 <option value={1500}>1.5s (Standard)</option>
@@ -117,7 +117,7 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
 
               <button
                 onClick={fetchLiveFrame}
-                className="p-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 transition-colors cursor-pointer"
+                className="p-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-slate-600 transition-colors cursor-pointer shadow-sm"
                 title="Sync Frame"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -126,7 +126,7 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
           </div>
 
           {/* Main Video Screen */}
-          <div className="relative aspect-video bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-2xl">
+          <div className="relative aspect-video bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-lg">
             {imageSrc ? (
               <img
                 src={imageSrc}
@@ -135,11 +135,11 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
               />
             ) : (
               <div className="text-center p-8 space-y-3">
-                <Radio className="w-10 h-10 text-slate-600 animate-pulse mx-auto" />
-                <p className="text-sm font-semibold text-slate-300">
+                <Radio className="w-10 h-10 text-slate-500 animate-pulse mx-auto" />
+                <p className="text-sm font-semibold text-slate-200">
                   {isLoading ? 'Connecting to candidate camera stream...' : 'No live frame signal received yet.'}
                 </p>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
                   The candidate's browser captures and quietly relays video frames every ~1.5 seconds.
                 </p>
               </div>
@@ -168,7 +168,7 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
                 </span>
                 <span>
                   Face Direction:{' '}
-                  <strong className="text-indigo-300 font-mono">
+                  <strong className="text-blue-300 font-mono">
                     {feedData?.looking_direction || 'CENTER'}
                   </strong>
                 </span>
@@ -180,25 +180,25 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
           </div>
 
           {/* Privacy & Silent Monitoring Notice */}
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-[11px] text-indigo-300 flex items-center space-x-2.5">
-            <ShieldCheck className="w-4 h-4 shrink-0 text-indigo-400" />
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-700 flex items-center space-x-2.5">
+            <ShieldCheck className="w-4 h-4 shrink-0 text-blue-600" />
             <span>
               <strong>Silent Proctoring Active:</strong> The candidate's examination arena has zero notifications or popups regarding live viewing, allowing natural, undisturbed monitoring.
             </span>
           </div>
 
           {/* Candidate Meta & Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200">
             <div className="text-xs space-y-0.5">
-              <p className="text-white font-bold">
+              <p className="text-slate-900 font-bold">
                 {feedData?.student_name || candidateName}
                 {feedData?.student_code && (
-                  <span className="text-slate-400 font-normal ml-1">
+                  <span className="text-slate-500 font-normal ml-1">
                     ({feedData.student_code})
                   </span>
                 )}
               </p>
-              <p className="text-[11px] text-slate-400 truncate max-w-md">
+              <p className="text-[11px] text-slate-500 truncate max-w-md">
                 {feedData?.exam_title || 'Examination Assessment'}
               </p>
             </div>
@@ -207,7 +207,7 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer border border-slate-200"
               >
                 Close Stream
               </button>
@@ -215,7 +215,7 @@ export const LiveCandidateWatchModal: React.FC<LiveCandidateWatchModalProps> = (
               <button
                 type="button"
                 onClick={() => setIsKickModalOpen(true)}
-                className="flex items-center space-x-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-600/20 transition-all cursor-pointer"
+                className="flex items-center space-x-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer"
               >
                 <UserX className="w-4 h-4" />
                 <span>Kick Candidate</span>

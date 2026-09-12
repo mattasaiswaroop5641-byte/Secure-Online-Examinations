@@ -56,12 +56,12 @@ export const ExamManagementPage: React.FC = () => {
   );
 
   return (
-    <div className="p-6 sm:p-8 space-y-6">
+    <div className="p-6 sm:p-8 space-y-6 bg-slate-50 min-h-screen">
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white tracking-tight">Examination Management</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Examination Management</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
             Configure examination schedules, durations, grading parameters, and question links.
           </p>
         </div>
@@ -71,7 +71,7 @@ export const ExamManagementPage: React.FC = () => {
             setEditingExam(null);
             setIsModalOpen(true);
           }}
-          className="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+          className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Create Examination</span>
@@ -80,13 +80,13 @@ export const ExamManagementPage: React.FC = () => {
 
       {/* Search Bar */}
       <div className="relative max-w-md">
-        <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter by exam title or subject..."
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+          className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm"
         />
       </div>
 
@@ -94,13 +94,13 @@ export const ExamManagementPage: React.FC = () => {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="h-48 bg-slate-900 rounded-2xl animate-pulse" />
+            <div key={n} className="h-48 bg-white border border-slate-200 rounded-2xl shadow-sm animate-pulse" />
           ))}
         </div>
       ) : filteredExams.length === 0 ? (
-        <div className="p-12 text-center bg-slate-900/50 rounded-3xl border border-slate-800">
-          <Layers className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-slate-300">No Examinations Found</p>
+        <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
+          <Layers className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-slate-900">No Examinations Found</p>
           <p className="text-xs text-slate-500 mt-1">Create an examination to begin enrolling candidates.</p>
         </div>
       ) : (
@@ -108,55 +108,55 @@ export const ExamManagementPage: React.FC = () => {
           {filteredExams.map((exam) => (
             <div
               key={exam.id}
-              className="p-5 bg-slate-900 border border-slate-800 rounded-3xl flex flex-col justify-between hover:border-slate-700/80 transition-all shadow-sm"
+              className="p-5 bg-white border border-slate-200 rounded-3xl flex flex-col justify-between hover:border-slate-300 transition-all shadow-sm"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-lg border border-indigo-500/20">
+                  <span className="font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200">
                     {exam.subject}
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       exam.status === 'active'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-slate-800 text-slate-400'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
                     }`}
                   >
                     {exam.status}
                   </span>
                 </div>
 
-                <h3 className="text-base font-bold text-white tracking-tight">{exam.title}</h3>
-                <p className="text-xs text-slate-400 line-clamp-2">{exam.description}</p>
+                <h3 className="text-base font-bold text-slate-900 tracking-tight">{exam.title}</h3>
+                <p className="text-xs text-slate-600 line-clamp-2">{exam.description}</p>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs text-slate-300">
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs text-slate-700">
                   <div className="flex items-center space-x-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
                     <span>{exam.duration_minutes} Mins</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
-                    <Award className="w-3.5 h-3.5 text-slate-500" />
+                    <Award className="w-3.5 h-3.5 text-slate-400" />
                     <span>{exam.total_marks} Marks</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
-                    <Layers className="w-3.5 h-3.5 text-slate-500" />
+                    <Layers className="w-3.5 h-3.5 text-slate-400" />
                     <span>{exam.question_count ?? 0} Questions</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
-                    <span className="text-slate-500 font-bold">#</span>
+                    <span className="text-slate-400 font-bold">#</span>
                     <span>{exam.attempt_count ?? 0} Attempts</span>
                   </div>
                 </div>
               </div>
 
               {/* Card Actions */}
-              <div className="flex items-center justify-end space-x-2 pt-4 border-t border-slate-800/80 mt-4">
+              <div className="flex items-center justify-end space-x-2 pt-4 border-t border-slate-100 mt-4">
                 <button
                   onClick={() => {
                     setEditingExam(exam);
                     setIsModalOpen(true);
                   }}
-                  className="p-2 text-slate-400 hover:text-indigo-300 hover:bg-slate-800 rounded-xl transition-colors"
+                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
                   title="Edit Exam"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -164,7 +164,7 @@ export const ExamManagementPage: React.FC = () => {
 
                 <button
                   onClick={() => handleDeleteExam(exam.id)}
-                  className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
+                  className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                   title="Delete Exam"
                 >
                   <Trash2 className="w-4 h-4" />

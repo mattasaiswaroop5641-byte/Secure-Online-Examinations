@@ -49,23 +49,23 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
       >
         <div className="space-y-4">
           {/* Event Meta Details Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
             <div className="flex items-center space-x-2">
               <span
                 className={`px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${severityClass}`}
               >
                 {event.severity}
               </span>
-              <span className="font-bold text-slate-200 text-sm">{event.event_type}</span>
+              <span className="font-bold text-slate-900 text-sm">{event.event_type}</span>
             </div>
 
-            <div className="text-slate-400 font-mono">
+            <div className="text-slate-500 font-mono">
               {formatDate(event.timestamp)}
             </div>
           </div>
 
           {/* Snapshot Image Container with Forensic Fallback */}
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner">
+          <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shadow-inner">
             {imageUrl && !imageFailed ? (
               <img
                 src={imageUrl}
@@ -74,32 +74,32 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
                 className="w-full h-full object-contain"
               />
             ) : (
-              <div className="w-full h-full p-6 flex flex-col justify-between bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+              <div className="w-full h-full p-6 flex flex-col justify-between bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 relative overflow-hidden">
                 {/* Simulated Forensic Watermark Header */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between text-[11px] font-mono text-slate-300">
+                <div className="bg-white/90 border border-slate-200 rounded-lg p-2.5 flex items-center justify-between text-[11px] font-mono text-slate-700">
                   <div className="flex items-center space-x-2">
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                    <span className="font-bold text-white">[ExamShield Forensic Audit]</span>
+                    <span className="font-bold text-slate-900">[ExamShield Forensic Audit]</span>
                     <span>{event.event_type}</span>
                   </div>
-                  <span className="text-slate-400">{formatDate(event.timestamp)}</span>
+                  <span className="text-slate-500">{formatDate(event.timestamp)}</span>
                 </div>
 
                 {/* Central Forensics Illustration */}
                 <div className="text-center my-auto space-y-2 py-4">
-                  <div className="inline-flex p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                  <div className="inline-flex p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600">
                     <ShieldAlert className="w-8 h-8" />
                   </div>
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                  <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                     {event.event_type.replace(/_/g, ' ')} INCIDENT RECORDED
                   </h4>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  <p className="text-xs text-slate-600 max-w-md mx-auto">
                     {event.description || 'Continuous computer vision monitoring flagged anomalous candidate activity during this session.'}
                   </p>
                 </div>
 
                 {/* Footer Audit Stamp */}
-                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono border-t border-slate-800/80 pt-2">
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono border-t border-slate-200 pt-2">
                   <span>Attempt ID: #{event.attempt_id}</span>
                   <span>Severity: {event.severity}</span>
                   <span>Duration: {event.duration_seconds ? `${event.duration_seconds}s` : 'Instant'}</span>
@@ -109,30 +109,30 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
           </div>
 
           {/* Description & Computer Vision Forensics Note */}
-          <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2 text-xs">
-            <p className="font-semibold text-slate-200 flex items-center space-x-1.5">
-              <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+            <p className="font-semibold text-slate-900 flex items-center space-x-1.5">
+              <Info className="w-4 h-4 text-blue-600 shrink-0" />
               <span>Incident Description</span>
             </p>
-            <p className="text-slate-300 leading-relaxed">{event.description}</p>
+            <p className="text-slate-700 leading-relaxed">{event.description}</p>
             <p className="text-[11px] text-slate-500 italic">
               Note: Bounding boxes and timestamps are watermarked onto the frame at time of capture by the OpenCV computer vision analysis engine.
             </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
             <div className="flex items-center space-x-2">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
               >
                 Close
               </button>
               {onDelete && (
                 <button
                   onClick={onDelete}
-                  className="flex items-center space-x-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs rounded-xl transition-all cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete Record</span>
@@ -144,21 +144,21 @@ export const EvidenceViewerModal: React.FC<EvidenceViewerModalProps> = ({
               {/* Kick / Disqualify Button */}
               <button
                 onClick={() => setIsKickModalOpen(true)}
-                className="flex items-center space-x-1.5 px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm"
+                className="flex items-center space-x-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm"
               >
                 <UserX className="w-4 h-4" />
                 <span>Kick Candidate</span>
               </button>
 
               {event.resolved ? (
-                <span className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                <span className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Reviewed</span>
                 </span>
               ) : (
                 <button
                   onClick={onResolve}
-                  className="flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Mark Resolved</span>

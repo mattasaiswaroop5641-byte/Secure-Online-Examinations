@@ -93,20 +93,20 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-xl w-full mx-auto shadow-2xl">
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-xl w-full mx-auto shadow-xl">
       <div className="text-center mb-5">
-        <span className="text-xs uppercase font-bold tracking-widest text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+        <span className="text-xs uppercase font-bold tracking-widest text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
           Step 3 of 4
         </span>
-        <h3 className="text-xl font-bold text-white tracking-tight mt-2">Candidate Face Verification</h3>
-        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+        <h3 className="text-xl font-bold text-slate-900 tracking-tight mt-2">Candidate Face Verification</h3>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
           Position your face inside the camera guide. Hold steady or click the capture button to verify.
         </p>
       </div>
 
       {/* Live Camera View with Oval Guide */}
-      <div className={`relative aspect-video max-w-md mx-auto rounded-2xl overflow-hidden bg-slate-950 border-2 shadow-inner mb-5 transition-all duration-300 ${
-        isVerified ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-slate-800'
+      <div className={`relative aspect-video max-w-md mx-auto rounded-2xl overflow-hidden bg-slate-900 border-2 shadow-inner mb-5 transition-all duration-300 ${
+        isVerified ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-slate-200'
       }`}>
         <video
           ref={videoRef}
@@ -133,21 +133,21 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
               isVerified
                 ? 'border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.4)]'
                 : calibratingSec > 50
-                ? 'border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                : 'border-indigo-400/80 border-dashed animate-pulse'
+                ? 'border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+                : 'border-blue-300/80 border-dashed animate-pulse'
             }`}
           />
         </div>
 
         {/* Floating Real-Time Status Pill */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-          <div className="flex items-center space-x-1.5 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700/60 text-xs text-slate-200">
+          <div className="flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700/60 text-xs text-slate-200">
             <span
               className={`w-2 h-2 rounded-full ${
                 isVerified
                   ? 'bg-emerald-400'
                   : calibratingSec > 0
-                  ? 'bg-cyan-400 animate-ping'
+                  ? 'bg-blue-400 animate-ping'
                   : 'bg-amber-400 animate-pulse'
               }`}
             />
@@ -160,32 +160,32 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
             </span>
           </div>
 
-          <div className="bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-700/60 text-[11px] font-mono text-cyan-400 font-bold">
+          <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-700/60 text-[11px] font-mono text-blue-400 font-bold">
             {calibratingSec}%
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="absolute bottom-0 inset-x-0 h-1.5 bg-slate-950/80">
+        <div className="absolute bottom-0 inset-x-0 h-1.5 bg-slate-900/80">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300"
+            className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-300"
             style={{ width: `${calibratingSec}%` }}
           />
         </div>
       </div>
 
       {/* Verification Status & Instant Action */}
-      <div className="mb-6 p-4 bg-slate-950/70 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+      <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="space-y-1 text-center sm:text-left">
-          <p className="font-semibold text-slate-200 flex items-center justify-center sm:justify-start space-x-1.5">
+          <p className="font-semibold text-slate-800 flex items-center justify-center sm:justify-start space-x-1.5">
             {isVerified ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 inline" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 inline" />
             ) : (
-              <Sparkles className="w-4 h-4 text-indigo-400 inline" />
+              <Sparkles className="w-4 h-4 text-blue-600 inline" />
             )}
             <span>{isVerified ? 'Biometric Baseline Verified' : 'Ready for Face Verification'}</span>
           </p>
-          <p className="text-slate-400 text-[11px]">
+          <p className="text-slate-500 text-[11px]">
             {isVerified
               ? 'Your face profile has been calibrated for continuous examination monitoring.'
               : 'Hold steady for 2 seconds or tap the capture button below.'}
@@ -196,7 +196,7 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
           <button
             type="button"
             onClick={handleManualVerify}
-            className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>Verify Face Now</span>
@@ -205,10 +205,10 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+      <div className="flex items-center justify-between pt-4 border-t border-slate-200">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+          className="px-4 py-2 text-sm text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
         >
           Back
         </button>
@@ -218,8 +218,8 @@ export const FaceVerificationStep: React.FC<FaceVerificationStepProps> = ({
           onClick={onVerified}
           className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
             isVerified
-              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 cursor-pointer'
-              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 cursor-pointer'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
           }`}
         >
           <span>Continue to Rules & Consent</span>
